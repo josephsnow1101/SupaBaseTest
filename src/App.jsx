@@ -45,7 +45,6 @@ export default function App() {
     fetchProducts();
     fetchLogs();
 
-    // Realtime subscription
     const channelProducts = supabase
       .channel("realtime:products")
       .on(
@@ -165,7 +164,7 @@ export default function App() {
       return;
     }
 
-    // Log the action
+    // Log action
     const { error: logError } = await supabase.from("product_logs").insert([
       {
         product_id: id,
@@ -245,23 +244,15 @@ export default function App() {
           <li key={p.id}>
             <strong>{p.name}</strong> — {p.quantity} 🗓️ {p.arrival_date}
             <div className="buttons">
-              {(isAdmin || !isAdmin) && (
-                <>
-                  <button
-                    onClick={() =>
-                      updateQuantity(p.id, isAdmin ? 1 : -1)
-                    }
-                  >
-                    {isAdmin ? "➕" : "➖"}
-                  </button>
-                  {!isAdmin && <span>Vendedor solo resta</span>}
-                </>
-              )}
               {isAdmin && (
                 <>
+                  <button onClick={() => updateQuantity(p.id, 1)}>➕</button>
                   <button onClick={() => updateQuantity(p.id, -1)}>➖</button>
                   <button onClick={() => deleteProduct(p.id)}>🗑️</button>
                 </>
+              )}
+              {!isAdmin && (
+                <button onClick={() => updateQuantity(p.id, -1)}>➖</button>
               )}
             </div>
           </li>
