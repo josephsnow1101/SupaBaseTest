@@ -1,3 +1,4 @@
+// App.jsx
 import React, { useEffect, useState } from "react";
 import { supabase } from "./supabaseClient";
 import "./styles.css";
@@ -19,9 +20,10 @@ export default function App() {
       .select("*")
       .order("id");
     if (error) console.error(error);
-    else setProducts(data);
+    else setProducts(data ?? []);
   };
 
+  // =================== SESSION + REALTIME ===================
   useEffect(() => {
     const getSession = async () => {
       const { data } = await supabase.auth.getSession();
@@ -30,38 +32,34 @@ export default function App() {
     getSession();
     fetchProducts();
 
-  const channel = supabase
-  .channel("realtime:products")
-  .on(
-    "postgres_changes",
-    { event: "*", schema: "public", table: "products" },
-    (payload) => {
-      console.log("Cambio detectado:", payload);
-      if (payload.eventType === "INSERT") {
-        setProducts((prev) => {
-          // Evitar duplicados (por optimistic update)
-          const exists = prev.some((p) => p.id === payload.new.id);
-          if (exists) return prev;
-          return [...prev, payload.new];
-        });
-      } else if (payload.eventType === "UPDATE") {
-        setProducts((prev) =>
-          prev.map((p) => (p.id === payload.new.id ? payload.new : p))
-        );
-      } else if (payload.eventType === "DELETE") {
-        setProducts((prev) => prev.filter((p) => p.id !== payload.old.id));
-      }
-    }
-  )
-  .subscribe();
+    const channel = supabase
+      .channel("public:products")
+      .on(
+        "postgres_changes",
+        { event: "*", schema: "public", table: "products" },
+        (payload) => {
+          // Actualización en vivo
+          if (payload.eventType === "INSERT") {
+            setProducts((prev) => [...prev, payload.new]);
+          } else if (payload.eventType === "UPDATE") {
+            setProducts((prev) =>
+              prev.map((p) => (p.id === payload.new.id ? payload.new : p))
+            );
+          } else if (payload.eventType === "DELETE") {
+            setProducts((prev) =>
+              prev.filter((p) => p.id !== payload.old.id)
+            );
+          }
+        }
+      )
+      .subscribe();
 
-    return () => {
-      supabase.removeChannel(channel);
-    };
+    return () => supabase.removeChannel(channel);
   }, []);
 
   // =================== AUTH ===================
   const signIn = async () => {
+    if (!email || !password) return alert("Ingresa email y contraseña");
     setLoading(true);
     const { data, error } = await supabase.auth.signInWithPassword({
       email,
@@ -71,6 +69,7 @@ export default function App() {
     if (error) return alert(error.message);
     setUser(data.user);
     fetchProducts();
+    setPassword(""); // limpia password del estado
   };
 
   const signOut = async () => {
@@ -78,21 +77,16 @@ export default function App() {
     setUser(null);
   };
 
-  // =================== CRUD ===================
+  const isAdmin = user?.email === "jsnowoliv@gmail.com";
+
+  // =================== CRUD OPTIMISTIC ===================
   const addProduct = async () => {
     if (!name) return alert("Ingresa un nombre");
     if (!arrivalDate) return alert("Ingresa la fecha de llegada");
 
-    // Normalizar fecha a YYYY-MM-DD
     const normalizedDate = new Date(arrivalDate).toISOString().split("T")[0];
+    const newProduct = { name, quantity: Number(qty), arrival_date: normalizedDate };
 
-    const newProduct = {
-      name,
-      quantity: Number(qty),
-      arrival_date: normalizedDate,
-    };
-
-    // Optimistic update
     const tempId = Date.now();
     setProducts((prev) => [...prev, { id: tempId, ...newProduct }]);
 
@@ -103,7 +97,7 @@ export default function App() {
 
     if (error) {
       console.error(error);
-      setProducts((prev) => prev.filter((p) => p.id !== tempId)); // rollback
+      setProducts((prev) => prev.filter((p) => p.id !== tempId));
       return;
     }
 
@@ -148,7 +142,6 @@ export default function App() {
 
   const deleteProduct = async (id) => {
     if (!confirm("¿Eliminar este producto?")) return;
-
     const backup = [...products];
     setProducts((prev) => prev.filter((p) => p.id !== id));
 
@@ -163,7 +156,7 @@ export default function App() {
   if (!user) {
     return (
       <div className="container">
-        <h2>🔑 Admin — iniciar sesión</h2>
+        <h2>🔑 Iniciar sesión</h2>
         <input
           placeholder="Email"
           value={email}
@@ -175,25 +168,19 @@ export default function App() {
           value={password}
           onChange={(e) => setPassword(e.target.value)}
         />
-        <div style={{ marginTop: 8 }}>
-          <button onClick={signIn} disabled={loading}>
-            {loading ? "Entrando..." : "Entrar"}
-          </button>
-        </div>
-        <p>
-          Usa el usuario admin que creaste en Supabase Auth:{" "}
-          <strong>jsnowoliv@gmail.com</strong>
-        </p>
+        <button onClick={signIn} disabled={loading}>
+          {loading ? "Entrando..." : "Entrar"}
+        </button>
       </div>
     );
   }
 
   return (
     <div className="container">
-      <h1>📦 Stock con Fechas</h1>
+      <h1>📦 Stock App con Fechas</h1>
       <button onClick={signOut}>🚪 Salir</button>
 
-      {user.email === "jsnowoliv@gmail.com" && (
+      {isAdmin && (
         <div className="form">
           <input
             placeholder="Producto"
@@ -202,10 +189,9 @@ export default function App() {
           />
           <input
             type="number"
-            value={qty}
             min="1"
+            value={qty}
             onChange={(e) => setQty(e.target.value)}
-            placeholder="Cantidad"
           />
           <input
             type="date"
@@ -222,13 +208,25 @@ export default function App() {
             <span>
               <strong>{p.name}</strong> — {p.quantity} 🗓️ {p.arrival_date}
             </span>
-            {user.email === "jsnowoliv@gmail.com" && (
-              <div className="buttons">
-                <button onClick={() => updateQuantity(p.id, +1)}>+1</button>
-                <button onClick={() => updateQuantity(p.id, -1)}>-1</button>
-                <button onClick={() => deleteProduct(p.id)}>🗑️</button>
-              </div>
-            )}
+
+            <div className="buttons">
+              {(isAdmin || !isAdmin) && (
+                <button
+                  onClick={() => updateQuantity(p.id, -1)}
+                  disabled={p.quantity <= 0 || isAdmin === false}
+                  title="Restar producto"
+                >
+                  ➖
+                </button>
+              )}
+
+              {isAdmin && (
+                <>
+                  <button onClick={() => updateQuantity(p.id, +1)}>➕</button>
+                  <button onClick={() => deleteProduct(p.id)}>🗑️</button>
+                </>
+              )}
+            </div>
           </li>
         ))}
       </ul>
