@@ -6,8 +6,8 @@ body, h1, h2, p, ul, li, input, button {
 }
 
 body {
-  background-color: #1E1E1E; /* Fondo oscuro gris carbón */
-  color: #F5ECD7; /* Texto arena claro */
+  background-color: #1E1E1E;
+  color: #F5ECD7;
   display: flex;
   justify-content: center;
   padding: 2rem;
@@ -17,7 +17,7 @@ body {
 .container {
   width: 100%;
   max-width: 600px;
-  background: #3F4E3E; /* Verde militar oscuro */
+  background: #3F4E3E;
   padding: 2rem;
   border-radius: 12px;
   box-shadow: 0 4px 12px rgba(0,0,0,0.4);
@@ -30,14 +30,57 @@ h1, h2 {
   color: #F5ECD7;
 }
 
-/* ========== FORMULARIOS ========== */
+/* ========== FORMULARIO DE AGREGAR PRODUCTO ========== */
+.form {
+  background: #2C3A2A;
+  padding: 1.2rem;
+  border-radius: 10px;
+  margin-bottom: 1.5rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.8rem;
+  box-shadow: 0 4px 10px rgba(0, 0, 0, 0.3);
+}
+
+.form input {
+  width: 100%;
+  padding: 0.7rem;
+  border-radius: 6px;
+  border: 1px solid #55614A;
+  background: #D8C9A6;
+  color: #2B2B2B;
+  font-size: 1rem;
+  transition: 0.2s;
+}
+
+.form input:focus {
+  outline: 2px solid #D8C9A6;
+}
+
+.form button {
+  background: #2B2B2B;
+  color: #F5ECD7;
+  padding: 0.8rem;
+  border-radius: 6px;
+  font-weight: bold;
+  border: none;
+  cursor: pointer;
+  transition: 0.2s;
+}
+
+.form button:hover {
+  background: #F5ECD7;
+  color: #2B2B2B;
+}
+
+/* ========== INPUTS Y BOTONES GENERALES ========== */
 input {
   padding: 0.6rem;
   margin: 0.4rem;
   border-radius: 6px;
   border: none;
   outline: none;
-  background: #D8C9A6; /* Beige claro */
+  background: #D8C9A6;
   color: #2B2B2B;
   font-size: 1rem;
 }
@@ -50,12 +93,12 @@ button {
   cursor: pointer;
   font-weight: bold;
   transition: 0.2s;
-  background: #2B2B2B; /* Botón oscuro */
+  background: #2B2B2B;
   color: #F5ECD7;
 }
 
 button:hover {
-  background: #F5ECD7; /* Hover arena */
+  background: #F5ECD7;
   color: #2B2B2B;
 }
 
@@ -75,7 +118,7 @@ ul {
 }
 
 .product {
-  background: #E7D6B1; /* Arena claro */
+  background: #E7D6B1;
   color: #171515;
   margin-bottom: 0.5rem;
   padding: 0.6rem 1rem;
@@ -92,7 +135,7 @@ ul {
 /* ========== LOGS ========== */
 .logs-container {
   margin-top: 20px;
-  background: #2A2A2A; /* Fondo gris oscuro */
+  background: #2A2A2A;
   padding: 15px;
   border-radius: 8px;
   box-shadow: 0 2px 6px rgba(0,0,0,0.3);
@@ -107,7 +150,7 @@ ul {
 }
 
 .clear-logs-btn {
-  background: #B0413E; /* Rojo apagado */
+  background: #B0413E;
   color: white;
   padding: 6px 12px;
   border: none;
@@ -117,7 +160,7 @@ ul {
 }
 
 .clear-logs-btn:hover {
-  background: #8F3532; /* Hover rojo oscuro */
+  background: #8F3532;
 }
 
 .logs-list {
@@ -152,46 +195,3 @@ ul {
   text-align: right;
   color: #AAA;
 }
-
-.form {
-  background: #2C3A2A; /* Verde oscuro elegante */
-  padding: 1.2rem;
-  border-radius: 10px;
-  margin-bottom: 1.5rem;
-  display: flex;
-  flex-direction: column;
-  gap: 0.8rem;
-  box-shadow: 0 4px 10px rgba(0, 0, 0, 0.3);
-}
-
-.form input {
-  width: 100%;
-  padding: 0.7rem;
-  border-radius: 6px;
-  border: 1px solid #55614A;
-  background: #E7D6B1;
-  color: #2B2B2B;
-  font-size: 1rem;
-  transition: 0.2s;
-}
-
-.form input:focus {
-  outline: 2px solid #D8C9A6;
-}
-
-.form button {
-  background: #2B2B2B;
-  color: #F5ECD7;
-  padding: 0.8rem;
-  border-radius: 6px;
-  font-weight: bold;
-  border: none;
-  cursor: pointer;
-  transition: 0.2s;
-}
-
-.form button:hover {
-  background: #F5ECD7;
-  color: #2B2B2B;
-}
-
