@@ -209,16 +209,24 @@ export default function App() {
               <strong>{p.name}</strong> — {p.quantity} 🗓️ {p.arrival_date}
             </span>
 
-            <div className="buttons">
-              {(isAdmin || !isAdmin) && (
-                <button
-                  onClick={() => updateQuantity(p.id, -1)}
-                  disabled={p.quantity <= 0 || isAdmin === false}
-                  title="Restar producto"
-                >
-                  ➖
-                </button>
-              )}
+         <div className="buttons">
+  {/* Todos pueden restar */}
+  <button
+    onClick={() => updateQuantity(p.id, -1)}
+    disabled={p.quantity <= 0}
+    title="Restar producto"
+  >
+    ➖
+  </button>
+
+  {/* Solo admin puede agregar cantidad o eliminar */}
+  {isAdmin && (
+    <>
+      <button onClick={() => updateQuantity(p.id, +1)}>➕</button>
+      <button onClick={() => deleteProduct(p.id)}>🗑️</button>
+    </>
+  )}
+</div>
 
               {isAdmin && (
                 <>
