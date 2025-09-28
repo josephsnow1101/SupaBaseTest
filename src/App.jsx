@@ -139,7 +139,7 @@ export default function App() {
           <button onClick={addProduct}>Agregar</button>
         </div>
       )}
-      // 👇 función para agregar producto
+      
 const addProduct = async () => {
   if (!name) return alert('Ingresa un nombre');
 
@@ -173,7 +173,6 @@ const deleteProduct = async (id) => {
     return;
   }
 
-  // ⬇️ Quitamos el producto del estado de inmediato
   setProducts((prev) => prev.filter((p) => p.id !== id));
 };
   <ul>
