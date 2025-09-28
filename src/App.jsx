@@ -10,9 +10,10 @@ export default function App() {
   const [password, setPassword] = useState('')
   const [loading, setLoading] = useState(false)
 
-  // Carga inicial
+  // =================== FETCH ===================
   const fetchProducts = async () => {
-    const { data } = await supabase.from('products').select('*').order('id')
+    const { data, error } = await supabase.from('products').select('*').order('id')
+    if (error) console.error(error)
     setProducts(data ?? [])
   }
 
@@ -32,8 +33,17 @@ export default function App() {
         'postgres_changes',
         { event: '*', schema: 'public', table: 'products' },
         (payload) => {
-          // Para simplicidad, re-fetch completo en cada cambio.
-          fetchProducts()
+          console.log('Cambio detectado:', payload)
+          // Actualización en vivo sin recargar
+          if (payload.eventType === 'INSERT') {
+            setProducts((prev) => [...prev, payload.new])
+          } else if (payload.eventType === 'UPDATE') {
+            setProducts((prev) =>
+              prev.map((p) => (p.id === payload.new.id ? payload.new : p))
+            )
+          } else if (payload.eventType === 'DELETE') {
+            setProducts((prev) => prev.filter((p) => p.id !== payload.old.id))
+          }
         }
       )
       .subscribe()
@@ -43,6 +53,7 @@ export default function App() {
     }
   }, [])
 
+  // =================== AUTH ===================
   const signIn = async () => {
     setLoading(true)
     const { data, error } = await supabase.auth.signInWithPassword({
@@ -60,6 +71,7 @@ export default function App() {
     setUser(null)
   }
 
+  // =================== CRUD ===================
   const addProduct = async () => {
     if (!name) return alert('Ingresa un nombre')
     await supabase.from('products').insert({ name, quantity: Number(qty) })
@@ -74,43 +86,74 @@ export default function App() {
   }
 
   const deleteProduct = async (id) => {
-    if (!confirm('Eliminar este producto?')) return
+    if (!confirm('¿Eliminar este producto?')) return
     await supabase.from('products').delete().eq('id', id)
   }
 
+  // =================== RENDER ===================
   if (!user) {
     return (
       <div className="container">
-        <h2>Admin — iniciar sesión</h2>
-        <input placeholder="Email" value={email} onChange={(e)=>setEmail(e.target.value)} />
-        <input placeholder="Password" type="password" value={password} onChange={(e)=>setPassword(e.target.value)} />
-        <div style={{marginTop:8}}>
-          <button onClick={signIn} disabled={loading}>{loading ? 'Entrando...' : 'Entrar'}</button>
+        <h2>🔑 Admin — iniciar sesión</h2>
+        <input
+          placeholder="Email"
+          value={email}
+          onChange={(e) => setEmail(e.target.value)}
+        />
+        <input
+          placeholder="Password"
+          type="password"
+          value={password}
+          onChange={(e) => setPassword(e.target.value)}
+        />
+        <div style={{ marginTop: 8 }}>
+          <button onClick={signIn} disabled={loading}>
+            {loading ? 'Entrando...' : 'Entrar'}
+          </button>
         </div>
-        <p>Usa el usuario admin que creaste en Supabase Auth (el email que pusiste en las políticas RLS: <strong>jsnowoliv@gmail.com</strong>).</p>
+        <p>
+          Usa el usuario admin que creaste en Supabase Auth:{' '}
+          <strong>jsnowoliv@gmail.com</strong>
+        </p>
       </div>
     )
   }
 
   return (
     <div className="container">
-      <h1>Stock en vivo</h1>
-      <div className="row">
-        <input placeholder="Producto" value={name} onChange={(e)=>setName(e.target.value)} />
-        <input type="number" value={qty} onChange={(e)=>setQty(e.target.value)} />
-        <button onClick={addProduct}>Agregar</button>
-        <button onClick={signOut}>Salir</button>
-      </div>
+      <h1>📦 Stock en vivo</h1>
+      <button onClick={signOut}>🚪 Salir</button>
+
+      {user.email === 'jsnowoliv@gmail.com' && (
+        <div className="row">
+          <input
+            placeholder="Producto"
+            value={name}
+            onChange={(e) => setName(e.target.value)}
+          />
+          <input
+            type="number"
+            value={qty}
+            onChange={(e) => setQty(e.target.value)}
+          />
+          <button onClick={addProduct}>Agregar</button>
+        </div>
+      )}
 
       <ul>
         {products.map((p) => (
           <li key={p.id} className="product">
-            <span>{p.name} ({p.quantity})</span>
-            <div className="buttons">
-              <button onClick={() => updateQuantity(p.id, +1)}>+1</button>
-              <button onClick={() => updateQuantity(p.id, -1)}>-1</button>
-              <button onClick={() => deleteProduct(p.id)}>Eliminar</button>
-            </div>
+            <span>
+              {p.name} ({p.quantity})
+            </span>
+
+            {user.email === 'jsnowoliv@gmail.com' && (
+              <div className="buttons">
+                <button onClick={() => updateQuantity(p.id, +1)}>+1</button>
+                <button onClick={() => updateQuantity(p.id, -1)}>-1</button>
+                <button onClick={() => deleteProduct(p.id)}>🗑️</button>
+              </div>
+            )}
           </li>
         ))}
       </ul>
