@@ -34,7 +34,6 @@ export default function App() {
         { event: '*', schema: 'public', table: 'products' },
         (payload) => {
           console.log('Cambio detectado:', payload)
-          // Actualización en vivo sin recargar
           if (payload.eventType === 'INSERT') {
             setProducts((prev) => [...prev, payload.new])
           } else if (payload.eventType === 'UPDATE') {
@@ -74,7 +73,22 @@ export default function App() {
   // =================== CRUD ===================
   const addProduct = async () => {
     if (!name) return alert('Ingresa un nombre')
-    await supabase.from('products').insert({ name, quantity: Number(qty) })
+
+    const { data, error } = await supabase
+      .from('products')
+      .insert({ name, quantity: Number(qty) })
+      .select()
+
+    if (error) {
+      console.error(error)
+      return
+    }
+
+    // ⬇️ Refrescar lista en el front inmediatamente
+    if (data && data.length > 0) {
+      setProducts((prev) => [...prev, ...data])
+    }
+
     setName('')
     setQty(0)
   }
@@ -87,7 +101,15 @@ export default function App() {
 
   const deleteProduct = async (id) => {
     if (!confirm('¿Eliminar este producto?')) return
-    await supabase.from('products').delete().eq('id', id)
+
+    const { error } = await supabase.from('products').delete().eq('id', id)
+    if (error) {
+      console.error(error)
+      return
+    }
+
+    // ⬇️ Quitamos de la lista en el front al instante
+    setProducts((prev) => prev.filter((p) => p.id !== id))
   }
 
   // =================== RENDER ===================
@@ -124,6 +146,7 @@ export default function App() {
       <h1>📦 Stock en vivo</h1>
       <button onClick={signOut}>🚪 Salir</button>
 
+      {/* Panel de admin */}
       {user.email === 'jsnowoliv@gmail.com' && (
         <div className="row">
           <input
@@ -139,43 +162,8 @@ export default function App() {
           <button onClick={addProduct}>Agregar</button>
         </div>
       )}
-      
-const addProduct = async () => {
-  if (!name) return alert('Ingresa un nombre');
 
-  const { data, error } = await supabase
-    .from('products')
-    .insert({ name, quantity: Number(qty) })
-    .select(); // 👈 devuelve el nuevo producto insertado
-
-  if (error) {
-    console.error(error);
-    return;
-  }
-
-  // ⬇️ Lo agregamos al estado inmediatamente
-  if (data && data.length > 0) {
-    setProducts((prev) => [...prev, ...data]);
-  }
-
-  setName('');
-  setQty(0);
-};
-
-// 👇 función para eliminar producto
-const deleteProduct = async (id) => {
-  if (!confirm('Eliminar este producto?')) return;
-
-  const { error } = await supabase.from('products').delete().eq('id', id);
-
-  if (error) {
-    console.error(error);
-    return;
-  }
-
-  setProducts((prev) => prev.filter((p) => p.id !== id));
-};
-  <ul>
+      <ul>
         {products.map((p) => (
           <li key={p.id} className="product">
             <span>
