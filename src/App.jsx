@@ -12,8 +12,10 @@ export default function App() {
   const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
   const [logs, setLogs] = useState([]);
+  const [modal, setModal] = useState({ open: false, type: "", productId: null });
 
   const isAdmin = user?.email?.toLowerCase() === "jsnowoliv@gmail.com";
+
   // =================== FETCH ===================
   const fetchProducts = async () => {
     const { data, error } = await supabase
@@ -24,42 +26,43 @@ export default function App() {
     else setProducts(data);
   };
 
-const fetchLogs = async () => {
-  const { data, error } = await supabase
-    .from("product_logs")
-    .select(`
-      id,
-      quantity_change,
-      created_at,
-      user_email,
-      product_id,
-      products:products(name)
-    `)
-    .order("created_at", { ascending: false });
+  const fetchLogs = async () => {
+    const { data, error } = await supabase
+      .from("product_logs")
+      .select(`
+        id,
+        quantity_change,
+        created_at,
+        user_email,
+        product_id,
+        products:products(name)
+      `)
+      .order("created_at", { ascending: false });
 
-  if (error) {
-    console.error("Error al obtener logs:", error);
-  } else {
-    setLogs(data);
-    console.log("Logs cargados:", data);
-  }
-};
-  // =================== EFFECT ===================
-useEffect(() => {
-  supabase.auth.getSession().then(({ data }) => {
-    if (data?.session?.user) setUser(data.session.user);
-  });
-
-  const { data: authListener } = supabase.auth.onAuthStateChange(
-    (event, session) => {
-      setUser(session?.user ?? null);
+    if (error) {
+      console.error("Error al obtener logs:", error);
+    } else {
+      setLogs(data);
+      console.log("Logs cargados:", data);
     }
-  );
+  };
 
-  fetchProducts();
-  fetchLogs();
+  // =================== EFFECT ===================
+  useEffect(() => {
+    supabase.auth.getSession().then(({ data }) => {
+      if (data?.session?.user) setUser(data.session.user);
+    });
 
-    // Realtime Products para todos
+    const { data: authListener } = supabase.auth.onAuthStateChange(
+      (event, session) => {
+        setUser(session?.user ?? null);
+      }
+    );
+
+    fetchProducts();
+    fetchLogs();
+
+    // Realtime Products
     const channelProducts = supabase
       .channel("realtime:products")
       .on(
@@ -73,13 +76,15 @@ useEffect(() => {
               prev.map((p) => (p.id === payload.new.id ? payload.new : p))
             );
           } else if (payload.eventType === "DELETE") {
-            setProducts((prev) => prev.filter((p) => p.id !== payload.old.id));
+            setProducts((prev) =>
+              prev.filter((p) => p.id !== payload.old.id)
+            );
           }
         }
       )
       .subscribe();
 
-    // Realtime Logs solo admin
+    // Realtime Logs
     const channelLogs = supabase
       .channel("realtime:logs")
       .on(
@@ -180,48 +185,43 @@ useEffect(() => {
     if (logError) console.error(logError);
   };
 
-const deleteProduct = (id) => {
-  if (!isAdmin) {
-    setModal({ open: true, type: "no-permission", productId: null });
-    return;
-  }
+  const deleteProduct = (id) => {
+    if (!isAdmin) return; // Sin modal ni acción para usuario@tienda
+    setModal({ open: true, type: "confirm-delete", productId: id });
+  };
 
-  setModal({ open: true, type: "confirm-delete", productId: id });
-};
+  const confirmDelete = async () => {
+    const id = modal.productId;
+    const backup = [...products];
+    setProducts((prev) => prev.filter((p) => p.id !== id));
 
-const confirmDelete = async () => {
-  const id = modal.productId;
-  const backup = [...products];
-  setProducts((prev) => prev.filter((p) => p.id !== id));
+    const { error } = await supabase.from("products").delete().eq("id", id);
+    if (error) {
+      console.error(error);
+      setProducts(backup);
+    }
+    setModal({ open: false, type: "", productId: null });
+  };
 
-  const { error } = await supabase.from("products").delete().eq("id", id);
-  if (error) {
-    console.error(error);
-    setProducts(backup);
-  }
-  setModal({ open: false, type: "", productId: null });
-};
+  const closeModal = () => {
+    setModal({ open: false, type: "", productId: null });
+  };
 
-const closeModal = () => {
-  setModal({ open: false, type: "", productId: null });
-};  
-  
-const clearLogs = async () => {
-  const { error } = await supabase
-    .from("product_logs")
-    .delete()
-    .gte("id", 0);
+  const clearLogs = async () => {
+    const { error } = await supabase
+      .from("product_logs")
+      .delete()
+      .gte("id", 0);
 
-  if (error) {
-    console.error("Error al borrar historial:", error);
-  } else {
-    setLogs([]);
-    // ✅ Re-fetch para que la suscripción siga activa correctamente
-    fetchLogs();
-  }
-};
+    if (error) {
+      console.error("Error al borrar historial:", error);
+    } else {
+      setLogs([]);
+      fetchLogs();
+    }
+  };
 
-  // =================== RENDER ===================
+  // =================== LOGIN VIEW ===================
   if (!user) {
     return (
       <div className="container">
@@ -244,33 +244,32 @@ const clearLogs = async () => {
     );
   }
 
-  {modal.open && (
-  <div className="modal-overlay">
-    <div className="modal-box">
-      {modal.type === "no-permission" && (
-        <>
-          <h3>Acceso denegado</h3>
-          <p>No tienes permiso para eliminar productos.</p>
-          <button onClick={closeModal}>Cerrar</button>
-        </>
-      )}
+  // =================== MODAL ===================
+  const renderModal = () => {
+    if (!modal.open || !isAdmin) return null;
+    return (
+      <div className="modal-overlay">
+        <div className="modal-box">
+          {modal.type === "confirm-delete" && (
+            <>
+              <h3>⚠️ Confirmar eliminación</h3>
+              <p>¿Seguro que deseas eliminar este producto?</p>
+              <div className="modal-buttons">
+                <button onClick={closeModal}>Cancelar</button>
+                <button onClick={confirmDelete}>Eliminar</button>
+              </div>
+            </>
+          )}
+        </div>
+      </div>
+    );
+  };
 
-      {modal.type === "confirm-delete" && (
-        <>
-          <h3>Confirmar eliminación</h3>
-          <p>¿Seguro que deseas eliminar este producto? Esta acción no se puede deshacer.</p>
-          <div className="modal-buttons">
-            <button onClick={closeModal}>Cancelar</button>
-            <button onClick={confirmDelete}>Eliminar</button>
-          </div>
-        </>
-      )}
-    </div>
-  </div>
-)}
-
+  // =================== MAIN VIEW ===================
   return (
     <div className="container">
+      {renderModal()}
+
       <h1>📦 Stock App</h1>
       <button onClick={signOut}>🚪 Salir</button>
 
@@ -315,27 +314,30 @@ const clearLogs = async () => {
           </li>
         ))}
       </ul>
-{isAdmin && (
-  <div className="logs-container">
-    <div className="logs-header">
-      <h2>📜 Historial de cambios</h2>
-      <button className="clear-logs-btn" onClick={clearLogs}>
-        Borrar historial
-      </button>
-    </div>
-    <ul className="logs-list">
-      {logs.map((log) => (
-        <li key={log.id} className="log-item">
-          <span className="log-user">{log.user_email}</span>
-          <span className="log-product">{log.products?.name || "Producto desconocido"}</span>
-          <span className="log-date">
-            {new Date(log.created_at).toLocaleString()}
-          </span>
-        </li>
-      ))}
-    </ul>
-  </div>
-)}
+
+      {isAdmin && (
+        <div className="logs-container">
+          <div className="logs-header">
+            <h2>📜 Historial de cambios</h2>
+            <button className="clear-logs-btn" onClick={clearLogs}>
+              Borrar historial
+            </button>
+          </div>
+          <ul className="logs-list">
+            {logs.map((log) => (
+              <li key={log.id} className="log-item">
+                <span className="log-user">{log.user_email}</span>
+                <span className="log-product">
+                  {log.products?.name || "Producto desconocido"}
+                </span>
+                <span className="log-date">
+                  {new Date(log.created_at).toLocaleString()}
+                </span>
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
     </div>
   );
 }
