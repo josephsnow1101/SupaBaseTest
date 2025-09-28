@@ -1,4 +1,3 @@
-// App.jsx
 import React, { useEffect, useState } from "react";
 import { supabase } from "./supabaseClient";
 import "./styles.css";
@@ -14,32 +13,29 @@ export default function App() {
   const [loading, setLoading] = useState(false);
   const [logs, setLogs] = useState([]);
 
+  const isAdmin = user?.email === "jsnowoliv@gmail.com";
+
   // =================== FETCH ===================
   const fetchProducts = async () => {
-    const { data, error } = await supabase.from("products").select("*").order("id");
+    const { data, error } = await supabase
+      .from("products")
+      .select("*")
+      .order("id");
     if (error) console.error(error);
     else setProducts(data);
   };
 
   const fetchLogs = async () => {
-    if (!user || user.email !== "jsnowoliv@gmail.com") return;
-
+    if (!isAdmin) return;
     const { data, error } = await supabase
       .from("product_logs")
-      .select(`
-        id,
-        product_id,
-        change,
-        created_at,
-        user_id,
-        products(name)
-      `)
+      .select("id, product_id, quantity_change, created_at, user_email")
       .order("created_at", { ascending: false });
-
     if (error) console.error(error);
     else setLogs(data);
   };
 
+  // =================== EFFECT ===================
   useEffect(() => {
     const getSession = async () => {
       const { data } = await supabase.auth.getSession();
@@ -49,7 +45,8 @@ export default function App() {
     fetchProducts();
     fetchLogs();
 
-    const channel = supabase
+    // Realtime subscription
+    const channelProducts = supabase
       .channel("realtime:products")
       .on(
         "postgres_changes",
@@ -66,17 +63,23 @@ export default function App() {
           }
         }
       )
+      .subscribe();
+
+    const channelLogs = supabase
+      .channel("realtime:logs")
       .on(
         "postgres_changes",
-        { event: "INSERT", schema: "public", table: "product_logs" },
-        (payload) => {
-          // Solo actualiza logs si es admin
-          if (user?.email === "jsnowoliv@gmail.com") fetchLogs();
+        { event: "*", schema: "public", table: "product_logs" },
+        () => {
+          fetchLogs();
         }
       )
       .subscribe();
 
-    return () => supabase.removeChannel(channel);
+    return () => {
+      supabase.removeChannel(channelProducts);
+      supabase.removeChannel(channelLogs);
+    };
   }, [user]);
 
   // =================== AUTH ===================
@@ -100,23 +103,36 @@ export default function App() {
 
   // =================== CRUD ===================
   const addProduct = async () => {
+    if (!isAdmin) return;
     if (!name) return alert("Ingresa un nombre");
     if (!arrivalDate) return alert("Ingresa la fecha de llegada");
 
-    const normalizedDate = new Date(arrivalDate).toISOString().split("T")[0];
-    const newProduct = { name, quantity: Number(qty), arrival_date: normalizedDate };
+    const newProduct = {
+      name,
+      quantity: Number(qty),
+      arrival_date: arrivalDate,
+    };
+
     const tempId = Date.now();
     setProducts((prev) => [...prev, { id: tempId, ...newProduct }]);
 
-    const { data, error } = await supabase.from("products").insert(newProduct).select();
+    const { data, error } = await supabase
+      .from("products")
+      .insert(newProduct)
+      .select();
+
     if (error) {
       console.error(error);
       setProducts((prev) => prev.filter((p) => p.id !== tempId));
       return;
     }
-    if (data?.length) {
-      setProducts((prev) => prev.map((p) => (p.id === tempId ? data[0] : p)));
+
+    if (data && data.length > 0) {
+      setProducts((prev) =>
+        prev.map((p) => (p.id === tempId ? data[0] : p))
+      );
     }
+
     setName("");
     setQty(1);
     setArrivalDate("");
@@ -125,28 +141,45 @@ export default function App() {
   const updateQuantity = async (id, delta) => {
     const product = products.find((p) => p.id === id);
     if (!product) return;
+
     const newQty = product.quantity + delta;
     if (newQty < 0) return;
 
     // Optimistic update
-    setProducts((prev) => prev.map((p) => (p.id === id ? { ...p, quantity: newQty } : p)));
+    setProducts((prev) =>
+      prev.map((p) => (p.id === id ? { ...p, quantity: newQty } : p))
+    );
 
-    const { error } = await supabase.from("products").update({ quantity: newQty }).eq("id", id);
-    if (!error) {
-      // Registrar en historial
-      await supabase.from("product_logs").insert({
-        product_id: id,
-        user_id: user.id,
-        change: delta,
-      });
-    } else {
+    const { error } = await supabase
+      .from("products")
+      .update({ quantity: newQty })
+      .eq("id", id);
+
+    if (error) {
       console.error(error);
-      setProducts((prev) => prev.map((p) => (p.id === id ? product : p)));
+      setProducts((prev) =>
+        prev.map((p) =>
+          p.id === id ? { ...p, quantity: product.quantity } : p
+        )
+      );
+      return;
     }
+
+    // Log the action
+    const { error: logError } = await supabase.from("product_logs").insert([
+      {
+        product_id: id,
+        quantity_change: delta,
+        user_email: user.email,
+      },
+    ]);
+    if (logError) console.error(logError);
   };
 
   const deleteProduct = async (id) => {
+    if (!isAdmin) return;
     if (!confirm("¿Eliminar este producto?")) return;
+
     const backup = [...products];
     setProducts((prev) => prev.filter((p) => p.id !== id));
 
@@ -162,23 +195,23 @@ export default function App() {
     return (
       <div className="container">
         <h2>🔑 Iniciar sesión</h2>
-        <input placeholder="Email" value={email} onChange={(e) => setEmail(e.target.value)} />
         <input
-          placeholder="Password"
+          placeholder="Email"
+          value={email}
+          onChange={(e) => setEmail(e.target.value)}
+        />
+        <input
           type="password"
+          placeholder="Password"
           value={password}
           onChange={(e) => setPassword(e.target.value)}
         />
-        <div style={{ marginTop: 8 }}>
-          <button onClick={signIn} disabled={loading}>
-            {loading ? "Entrando..." : "Entrar"}
-          </button>
-        </div>
+        <button onClick={signIn} disabled={loading}>
+          {loading ? "Entrando..." : "Entrar"}
+        </button>
       </div>
     );
   }
-
-  const isAdmin = user.email === "jsnowoliv@gmail.com";
 
   return (
     <div className="container">
@@ -187,30 +220,46 @@ export default function App() {
 
       {isAdmin && (
         <div className="form">
-          <input placeholder="Producto" value={name} onChange={(e) => setName(e.target.value)} />
+          <input
+            placeholder="Nombre del producto"
+            value={name}
+            onChange={(e) => setName(e.target.value)}
+          />
           <input
             type="number"
-            value={qty}
             min="1"
+            value={qty}
             onChange={(e) => setQty(e.target.value)}
-            placeholder="Cantidad"
           />
-          <input type="date" value={arrivalDate} onChange={(e) => setArrivalDate(e.target.value)} />
+          <input
+            type="date"
+            value={arrivalDate}
+            onChange={(e) => setArrivalDate(e.target.value)}
+          />
           <button onClick={addProduct}>Agregar</button>
         </div>
       )}
 
       <ul>
         {products.map((p) => (
-          <li key={p.id} className="product">
-            <span>
-              <strong>{p.name}</strong> — {p.quantity} 🗓️ {p.arrival_date}
-            </span>
+          <li key={p.id}>
+            <strong>{p.name}</strong> — {p.quantity} 🗓️ {p.arrival_date}
             <div className="buttons">
-              <button onClick={() => updateQuantity(p.id, -1)}>➖</button>
+              {(isAdmin || !isAdmin) && (
+                <>
+                  <button
+                    onClick={() =>
+                      updateQuantity(p.id, isAdmin ? 1 : -1)
+                    }
+                  >
+                    {isAdmin ? "➕" : "➖"}
+                  </button>
+                  {!isAdmin && <span>Vendedor solo resta</span>}
+                </>
+              )}
               {isAdmin && (
                 <>
-                  <button onClick={() => updateQuantity(p.id, +1)}>➕</button>
+                  <button onClick={() => updateQuantity(p.id, -1)}>➖</button>
                   <button onClick={() => deleteProduct(p.id)}>🗑️</button>
                 </>
               )}
@@ -221,11 +270,12 @@ export default function App() {
 
       {isAdmin && (
         <div className="logs">
-          <h2>📋 Historial de movimientos</h2>
+          <h2>📜 Historial de cambios</h2>
           <ul>
             {logs.map((log) => (
               <li key={log.id}>
-                Usuario: {log.user_id} — Producto: {log.products?.name} — Cambio: {log.change} — {log.created_at}
+                Producto ID {log.product_id} — cambio {log.quantity_change} —{" "}
+                Usuario: {log.user_email} — {log.created_at}
               </li>
             ))}
           </ul>
