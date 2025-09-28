@@ -29,8 +29,15 @@ export default function App() {
     if (!isAdmin) return;
     const { data, error } = await supabase
       .from("product_logs")
-      .select("id, product_id, quantity_change, created_at, user_email")
+      .select(`
+        id,
+        quantity_change,
+        created_at,
+        user_email,
+        products(name)
+      `)
       .order("created_at", { ascending: false });
+
     if (error) console.error(error);
     else setLogs(data);
   };
@@ -38,7 +45,7 @@ export default function App() {
   // =================== EFFECT ===================
   useEffect(() => {
     // Detectar sesión activa
-    const session = supabase.auth.getSession().then(({ data }) => {
+    supabase.auth.getSession().then(({ data }) => {
       if (data?.session?.user) setUser(data.session.user);
     });
 
@@ -264,8 +271,7 @@ export default function App() {
           <ul>
             {logs.map((log) => (
               <li key={log.id}>
-                Producto ID {log.product_id} — cambio {log.quantity_change} —{" "}
-                Usuario: {log.user_email} — {log.created_at}
+                Producto: {log.products?.name} — Cambio: {log.quantity_change} — Usuario: {log.user_email} — {log.created_at}
               </li>
             ))}
           </ul>
