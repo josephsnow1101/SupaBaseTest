@@ -4,22 +4,52 @@ import { supabase } from "./supabaseClient";
 import "./styles.css";
 
 function App() {
+  const [user, setUser] = useState(null);
   const [products, setProducts] = useState([]);
   const [name, setName] = useState("");
   const [qty, setQty] = useState(1);
-  const [arrivalDate, setArrivalDate] = useState(""); // ⬅️ fecha de llegada
+  const [arrivalDate, setArrivalDate] = useState("");
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+  const [loading, setLoading] = useState(false);
+
+  // =================== FETCH ===================
+  const fetchProducts = async () => {
+    const { data, error } = await supabase
+      .from("products")
+      .select("*")
+      .order("arrival_date", { ascending: true });
+
+    if (error) console.error(error);
+    setProducts(data ?? []);
+  };
 
   useEffect(() => {
+    const getSession = async () => {
+      const { data } = await supabase.auth.getSession();
+      if (data?.session?.user) setUser(data.session.user);
+    };
+    getSession();
     fetchProducts();
 
     const channel = supabase
-      .channel("public:products")
+      .channel("realtime:products")
       .on(
         "postgres_changes",
         { event: "*", schema: "public", table: "products" },
         (payload) => {
           console.log("Cambio detectado:", payload);
-          fetchProducts();
+          if (payload.eventType === "INSERT") {
+            setProducts((prev) => [...prev, payload.new]);
+          } else if (payload.eventType === "UPDATE") {
+            setProducts((prev) =>
+              prev.map((p) => (p.id === payload.new.id ? payload.new : p))
+            );
+          } else if (payload.eventType === "DELETE") {
+            setProducts((prev) =>
+              prev.filter((p) => p.id !== payload.old.id)
+            );
+          }
         }
       )
       .subscribe();
@@ -29,23 +59,35 @@ function App() {
     };
   }, []);
 
-  const fetchProducts = async () => {
-    const { data, error } = await supabase.from("products").select("*");
-    if (error) console.error(error);
-    else setProducts(data);
+  // =================== AUTH ===================
+  const signIn = async () => {
+    setLoading(true);
+    const { data, error } = await supabase.auth.signInWithPassword({
+      email,
+      password,
+    });
+    setLoading(false);
+    if (error) return alert(error.message);
+    setUser(data.user);
+    fetchProducts();
   };
 
+  const signOut = async () => {
+    await supabase.auth.signOut();
+    setUser(null);
+  };
+
+  // =================== CRUD ===================
   const addProduct = async () => {
     if (!name) return alert("Ingresa un nombre");
-    if (!arrivalDate) return alert("Ingresa la fecha de llegada"); // ⬅️ validación
+    if (!arrivalDate) return alert("Ingresa la fecha de llegada");
 
     const newProduct = {
       name,
       quantity: Number(qty),
-      arrival_date: arrivalDate, // ⬅️ guardamos la fecha
+      arrival_date: arrivalDate,
     };
 
-    // Optimistic update
     const tempId = Date.now();
     setProducts((prev) => [...prev, { id: tempId, ...newProduct }]);
 
@@ -56,7 +98,6 @@ function App() {
 
     if (error) {
       console.error(error);
-      // rollback
       setProducts((prev) => prev.filter((p) => p.id !== tempId));
       return;
     }
@@ -69,21 +110,7 @@ function App() {
 
     setName("");
     setQty(1);
-    setArrivalDate(""); // ⬅️ limpiamos el campo
-  };
-
-  const deleteProduct = async (id) => {
-    if (!confirm("Eliminar este producto?")) return;
-
-    const oldProducts = [...products];
-    setProducts((prev) => prev.filter((p) => p.id !== id));
-
-    const { error } = await supabase.from("products").delete().eq("id", id);
-
-    if (error) {
-      console.error(error);
-      setProducts(oldProducts); // rollback
-    }
+    setArrivalDate("");
   };
 
   const updateQuantity = async (id, delta) => {
@@ -93,7 +120,6 @@ function App() {
     const newQty = product.quantity + delta;
     if (newQty < 0) return;
 
-    // Optimistic update
     setProducts((prev) =>
       prev.map((p) => (p.id === id ? { ...p, quantity: newQty } : p))
     );
@@ -105,31 +131,65 @@ function App() {
 
     if (error) {
       console.error(error);
-      // rollback
-      setProducts((prev) =>
-        prev.map((p) =>
-          p.id === id ? { ...p, quantity: product.quantity } : p
-        )
-      );
+      fetchProducts(); // rollback
     }
   };
 
-  return (
-    <div className="app">
-      <h1>📦 Stock App con Fechas</h1>
+  const deleteProduct = async (id) => {
+    if (!confirm("¿Eliminar este producto?")) return;
 
-      <div className="form">
+    const backup = [...products];
+    setProducts((prev) => prev.filter((p) => p.id !== id));
+
+    const { error } = await supabase.from("products").delete().eq("id", id);
+
+    if (error) {
+      console.error(error);
+      setProducts(backup);
+    }
+  };
+
+  // =================== RENDER ===================
+  if (!user) {
+    return (
+      <div className="container">
+        <h2>🔑 Admin — iniciar sesión</h2>
         <input
+          placeholder="Email"
+          value={email}
+          onChange={(e) => setEmail(e.target.value)}
+        />
+        <input
+          placeholder="Password"
+          type="password"
+          value={password}
+          onChange={(e) => setPassword(e.target.value)}
+        />
+        <div style={{ marginTop: 8 }}>
+          <button onClick={signIn} disabled={loading}>
+            {loading ? "Entrando..." : "Entrar"}
+          </button>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="container">
+      <h1>📦 Stock con Fechas</h1>
+      <button onClick={signOut}>🚪 Salir</button>
+
+      <div className="row">
+        <input
+          placeholder="Producto"
           value={name}
           onChange={(e) => setName(e.target.value)}
-          placeholder="Nombre del producto"
         />
         <input
           type="number"
-          value={qty}
           min="1"
+          value={qty}
           onChange={(e) => setQty(e.target.value)}
-          placeholder="Cantidad"
         />
         <input
           type="date"
@@ -140,16 +200,15 @@ function App() {
       </div>
 
       <ul>
-        {products.map((item) => (
-          <li key={item.id}>
+        {products.map((p) => (
+          <li key={p.id} className="product">
             <span>
-              <strong>{item.name}</strong> — {item.quantity} 🗓️{" "}
-              {item.arrival_date}
+              <strong>{p.name}</strong> — {p.quantity} 🗓️ {p.arrival_date}
             </span>
-            <div className="actions">
-              <button onClick={() => updateQuantity(item.id, 1)}>➕</button>
-              <button onClick={() => updateQuantity(item.id, -1)}>➖</button>
-              <button onClick={() => deleteProduct(item.id)}>🗑️</button>
+            <div className="buttons">
+              <button onClick={() => updateQuantity(p.id, +1)}>+1</button>
+              <button onClick={() => updateQuantity(p.id, -1)}>-1</button>
+              <button onClick={() => deleteProduct(p.id)}>🗑️</button>
             </div>
           </li>
         ))}
