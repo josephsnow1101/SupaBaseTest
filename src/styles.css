@@ -152,3 +152,46 @@ ul {
   text-align: right;
   color: #AAA;
 }
+
+.form {
+  background: #2C3A2A; /* Verde oscuro elegante */
+  padding: 1.2rem;
+  border-radius: 10px;
+  margin-bottom: 1.5rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.8rem;
+  box-shadow: 0 4px 10px rgba(0, 0, 0, 0.3);
+}
+
+.form input {
+  width: 100%;
+  padding: 0.7rem;
+  border-radius: 6px;
+  border: 1px solid #55614A;
+  background: #E7D6B1;
+  color: #2B2B2B;
+  font-size: 1rem;
+  transition: 0.2s;
+}
+
+.form input:focus {
+  outline: 2px solid #D8C9A6;
+}
+
+.form button {
+  background: #2B2B2B;
+  color: #F5ECD7;
+  padding: 0.8rem;
+  border-radius: 6px;
+  font-weight: bold;
+  border: none;
+  cursor: pointer;
+  transition: 0.2s;
+}
+
+.form button:hover {
+  background: #F5ECD7;
+  color: #2B2B2B;
+}
+
