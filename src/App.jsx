@@ -180,19 +180,32 @@ useEffect(() => {
     if (logError) console.error(logError);
   };
 
-  const deleteProduct = async (id) => {
-    if (!isAdmin) return;
-    if (!confirm("¿Eliminar este producto?")) return;
+const deleteProduct = (id) => {
+  if (!isAdmin) {
+    setModal({ open: true, type: "no-permission", productId: null });
+    return;
+  }
 
-    const backup = [...products];
-    setProducts((prev) => prev.filter((p) => p.id !== id));
+  setModal({ open: true, type: "confirm-delete", productId: id });
+};
 
-    const { error } = await supabase.from("products").delete().eq("id", id);
-    if (error) {
-      console.error(error);
-      setProducts(backup);
-    }
-  };
+const confirmDelete = async () => {
+  const id = modal.productId;
+  const backup = [...products];
+  setProducts((prev) => prev.filter((p) => p.id !== id));
+
+  const { error } = await supabase.from("products").delete().eq("id", id);
+  if (error) {
+    console.error(error);
+    setProducts(backup);
+  }
+  setModal({ open: false, type: "", productId: null });
+};
+
+const closeModal = () => {
+  setModal({ open: false, type: "", productId: null });
+};  
+  
 const clearLogs = async () => {
   const { error } = await supabase
     .from("product_logs")
@@ -230,6 +243,31 @@ const clearLogs = async () => {
       </div>
     );
   }
+
+  {modal.open && (
+  <div className="modal-overlay">
+    <div className="modal-box">
+      {modal.type === "no-permission" && (
+        <>
+          <h3>Acceso denegado</h3>
+          <p>No tienes permiso para eliminar productos.</p>
+          <button onClick={closeModal}>Cerrar</button>
+        </>
+      )}
+
+      {modal.type === "confirm-delete" && (
+        <>
+          <h3>Confirmar eliminación</h3>
+          <p>¿Seguro que deseas eliminar este producto? Esta acción no se puede deshacer.</p>
+          <div className="modal-buttons">
+            <button onClick={closeModal}>Cancelar</button>
+            <button onClick={confirmDelete}>Eliminar</button>
+          </div>
+        </>
+      )}
+    </div>
+  </div>
+)}
 
   return (
     <div className="container">
