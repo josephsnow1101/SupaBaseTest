@@ -1,4 +1,3 @@
-// App.jsx
 import React, { useEffect, useState } from "react";
 import { supabase } from "./supabaseClient";
 import "./styles.css";
@@ -13,18 +12,17 @@ export default function App() {
   const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
 
+  const isAdmin = user?.email === "jsnowoliv@gmail.com";
+
   // =================== FETCH ===================
   const fetchProducts = async () => {
-    const { data, error } = await supabase
-      .from("products")
-      .select("*")
-      .order("id");
+    const { data, error } = await supabase.from("products").select("*").order("id");
     if (error) console.error(error);
     else setProducts(data ?? []);
   };
 
-  // =================== SESSION + REALTIME ===================
   useEffect(() => {
+    // Mantener sesión
     const getSession = async () => {
       const { data } = await supabase.auth.getSession();
       if (data?.session?.user) setUser(data.session.user);
@@ -32,13 +30,13 @@ export default function App() {
     getSession();
     fetchProducts();
 
+    // Suscripción en tiempo real
     const channel = supabase
-      .channel("public:products")
+      .channel("realtime:products")
       .on(
         "postgres_changes",
         { event: "*", schema: "public", table: "products" },
         (payload) => {
-          // Actualización en vivo
           if (payload.eventType === "INSERT") {
             setProducts((prev) => [...prev, payload.new]);
           } else if (payload.eventType === "UPDATE") {
@@ -46,30 +44,25 @@ export default function App() {
               prev.map((p) => (p.id === payload.new.id ? payload.new : p))
             );
           } else if (payload.eventType === "DELETE") {
-            setProducts((prev) =>
-              prev.filter((p) => p.id !== payload.old.id)
-            );
+            setProducts((prev) => prev.filter((p) => p.id !== payload.old.id));
           }
         }
       )
       .subscribe();
 
-    return () => supabase.removeChannel(channel);
+    return () => {
+      supabase.removeChannel(channel);
+    };
   }, []);
 
   // =================== AUTH ===================
   const signIn = async () => {
-    if (!email || !password) return alert("Ingresa email y contraseña");
     setLoading(true);
-    const { data, error } = await supabase.auth.signInWithPassword({
-      email,
-      password,
-    });
+    const { data, error } = await supabase.auth.signInWithPassword({ email, password });
     setLoading(false);
     if (error) return alert(error.message);
     setUser(data.user);
     fetchProducts();
-    setPassword(""); // limpia password del estado
   };
 
   const signOut = async () => {
@@ -77,9 +70,7 @@ export default function App() {
     setUser(null);
   };
 
-  const isAdmin = user?.email === "jsnowoliv@gmail.com";
-
-  // =================== CRUD OPTIMISTIC ===================
+  // =================== CRUD ===================
   const addProduct = async () => {
     if (!name) return alert("Ingresa un nombre");
     if (!arrivalDate) return alert("Ingresa la fecha de llegada");
@@ -87,13 +78,11 @@ export default function App() {
     const normalizedDate = new Date(arrivalDate).toISOString().split("T")[0];
     const newProduct = { name, quantity: Number(qty), arrival_date: normalizedDate };
 
+    // Optimistic update
     const tempId = Date.now();
     setProducts((prev) => [...prev, { id: tempId, ...newProduct }]);
 
-    const { data, error } = await supabase
-      .from("products")
-      .insert(newProduct)
-      .select();
+    const { data, error } = await supabase.from("products").insert(newProduct).select();
 
     if (error) {
       console.error(error);
@@ -102,9 +91,7 @@ export default function App() {
     }
 
     if (data && data.length > 0) {
-      setProducts((prev) =>
-        prev.map((p) => (p.id === tempId ? data[0] : p))
-      );
+      setProducts((prev) => prev.map((p) => (p.id === tempId ? data[0] : p)));
     }
 
     setName("");
@@ -115,7 +102,6 @@ export default function App() {
   const updateQuantity = async (id, delta) => {
     const product = products.find((p) => p.id === id);
     if (!product) return;
-
     const newQty = product.quantity + delta;
     if (newQty < 0) return;
 
@@ -124,31 +110,25 @@ export default function App() {
       prev.map((p) => (p.id === id ? { ...p, quantity: newQty } : p))
     );
 
-    const { error } = await supabase
-      .from("products")
-      .update({ quantity: newQty })
-      .eq("id", id);
-
+    const { error } = await supabase.from("products").update({ quantity: newQty }).eq("id", id);
     if (error) {
       console.error(error);
-      // rollback
       setProducts((prev) =>
-        prev.map((p) =>
-          p.id === id ? { ...p, quantity: product.quantity } : p
-        )
+        prev.map((p) => (p.id === id ? { ...p, quantity: product.quantity } : p))
       );
     }
   };
 
   const deleteProduct = async (id) => {
     if (!confirm("¿Eliminar este producto?")) return;
+
     const backup = [...products];
     setProducts((prev) => prev.filter((p) => p.id !== id));
 
     const { error } = await supabase.from("products").delete().eq("id", id);
     if (error) {
       console.error(error);
-      setProducts(backup); // rollback
+      setProducts(backup);
     }
   };
 
@@ -157,11 +137,7 @@ export default function App() {
     return (
       <div className="container">
         <h2>🔑 Iniciar sesión</h2>
-        <input
-          placeholder="Email"
-          value={email}
-          onChange={(e) => setEmail(e.target.value)}
-        />
+        <input placeholder="Email" value={email} onChange={(e) => setEmail(e.target.value)} />
         <input
           placeholder="Password"
           type="password"
@@ -171,27 +147,25 @@ export default function App() {
         <button onClick={signIn} disabled={loading}>
           {loading ? "Entrando..." : "Entrar"}
         </button>
+        <p>Usuario admin: <strong>jsnowoliv@gmail.com</strong></p>
       </div>
     );
   }
 
   return (
     <div className="container">
-      <h1>📦 Stock App con Fechas</h1>
+      <h1>📦 Stock en vivo</h1>
       <button onClick={signOut}>🚪 Salir</button>
 
       {isAdmin && (
         <div className="form">
-          <input
-            placeholder="Producto"
-            value={name}
-            onChange={(e) => setName(e.target.value)}
-          />
+          <input placeholder="Producto" value={name} onChange={(e) => setName(e.target.value)} />
           <input
             type="number"
-            min="1"
             value={qty}
+            min="1"
             onChange={(e) => setQty(e.target.value)}
+            placeholder="Cantidad"
           />
           <input
             type="date"
@@ -209,25 +183,13 @@ export default function App() {
               <strong>{p.name}</strong> — {p.quantity} 🗓️ {p.arrival_date}
             </span>
 
-         <div className="buttons">
-  {/* Todos pueden restar */}
-  <button
-    onClick={() => updateQuantity(p.id, -1)}
-    disabled={p.quantity <= 0}
-    title="Restar producto"
-  >
-    ➖
-  </button>
+            <div className="buttons">
+              {/* Todos pueden restar */}
+              <button onClick={() => updateQuantity(p.id, -1)} disabled={p.quantity <= 0}>
+                ➖
+              </button>
 
-  {/* Solo admin puede agregar cantidad o eliminar */}
-  {isAdmin && (
-    <>
-      <button onClick={() => updateQuantity(p.id, +1)}>➕</button>
-      <button onClick={() => deleteProduct(p.id)}>🗑️</button>
-    </>
-  )}
-</div>
-
+              {/* Solo admin */}
               {isAdmin && (
                 <>
                   <button onClick={() => updateQuantity(p.id, +1)}>➕</button>
