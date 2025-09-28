@@ -194,12 +194,16 @@ useEffect(() => {
       setProducts(backup);
     }
   };
-  const clearLogs = async () => {
-  const { error } = await supabase.from("product_logs").delete().neq("id", 0);
+const clearLogs = async () => {
+  const { error } = await supabase
+    .from("product_logs")
+    .delete()
+    .gte("id", 0); // borra todos
+
   if (error) {
     console.error("Error al borrar historial:", error);
   } else {
-    setLogs([]);
+    setLogs([]); // limpia el frontend
   }
 };
 
