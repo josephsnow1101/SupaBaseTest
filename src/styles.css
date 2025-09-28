@@ -6,8 +6,8 @@ body, h1, h2, p, ul, li, input, button {
 }
 
 body {
-  background-color: #171515; /* Fondo oscuro */
-  color: #E6D6AC; /* Texto claro */
+  background-color: #1E1E1E; /* Fondo oscuro gris carbón */
+  color: #F5ECD7; /* Texto arena claro */
   display: flex;
   justify-content: center;
   padding: 2rem;
@@ -17,22 +17,17 @@ body {
 .container {
   width: 100%;
   max-width: 600px;
-  background: #5D7544; /* Verde oliva */
+  background: #3F4E3E; /* Verde militar oscuro */
   padding: 2rem;
   border-radius: 12px;
   box-shadow: 0 4px 12px rgba(0,0,0,0.4);
 }
 
 /* ========== TITULOS ========== */
-h1 {
+h1, h2 {
   text-align: center;
   margin-bottom: 1rem;
-  color: #E6D6AC;
-}
-
-h2 {
-  margin-bottom: 1rem;
-  color: #E6D6AC;
+  color: #F5ECD7;
 }
 
 /* ========== FORMULARIOS ========== */
@@ -42,8 +37,8 @@ input {
   border-radius: 6px;
   border: none;
   outline: none;
-  background: #E6D6AC;
-  color: #171515;
+  background: #D8C9A6; /* Beige claro */
+  color: #2B2B2B;
   font-size: 1rem;
 }
 
@@ -55,17 +50,13 @@ button {
   cursor: pointer;
   font-weight: bold;
   transition: 0.2s;
-}
-
-/* Botones principales */
-button {
-  background: #171515;
-  color: #E6D6AC;
+  background: #2B2B2B; /* Botón oscuro */
+  color: #F5ECD7;
 }
 
 button:hover {
-  background: #E6D6AC;
-  color: #171515;
+  background: #F5ECD7; /* Hover arena */
+  color: #2B2B2B;
 }
 
 /* Botones de acción en la lista */
@@ -84,7 +75,7 @@ ul {
 }
 
 .product {
-  background: #E6D6AC;
+  background: #E7D6B1; /* Arena claro */
   color: #171515;
   margin-bottom: 0.5rem;
   padding: 0.6rem 1rem;
@@ -98,12 +89,14 @@ ul {
   font-weight: bold;
 }
 
+/* ========== LOGS ========== */
 .logs-container {
   margin-top: 20px;
-  background: #f9f9f9;
+  background: #2A2A2A; /* Fondo gris oscuro */
   padding: 15px;
   border-radius: 8px;
-  box-shadow: 0 2px 6px rgba(0,0,0,0.1);
+  box-shadow: 0 2px 6px rgba(0,0,0,0.3);
+  color: #F5ECD7;
 }
 
 .logs-header {
@@ -114,7 +107,7 @@ ul {
 }
 
 .clear-logs-btn {
-  background: #e63946;
+  background: #B0413E; /* Rojo apagado */
   color: white;
   padding: 6px 12px;
   border: none;
@@ -124,7 +117,7 @@ ul {
 }
 
 .clear-logs-btn:hover {
-  background: #c82333;
+  background: #8F3532; /* Hover rojo oscuro */
 }
 
 .logs-list {
@@ -137,8 +130,9 @@ ul {
   display: grid;
   grid-template-columns: 1fr 1fr auto;
   padding: 10px;
-  border-bottom: 1px solid #ddd;
+  border-bottom: 1px solid #444;
   font-size: 14px;
+  color: #F5ECD7;
 }
 
 .log-item:last-child {
@@ -151,10 +145,10 @@ ul {
 
 .log-product {
   text-align: center;
-  color: #444;
+  color: #D8C9A6;
 }
 
 .log-date {
   text-align: right;
-  color: #777;
+  color: #AAA;
 }
