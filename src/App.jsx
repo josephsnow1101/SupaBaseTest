@@ -1,3 +1,4 @@
+```jsx
 import { useEffect, useState } from 'react'
 import { supabase } from './supabaseClient'
 
@@ -18,7 +19,6 @@ export default function App() {
   }
 
   useEffect(() => {
-    // Mantener sesión si ya hay user
     const getSession = async () => {
       const { data } = await supabase.auth.getSession()
       if (data?.session?.user) setUser(data.session.user)
@@ -26,7 +26,7 @@ export default function App() {
     getSession()
     fetchProducts()
 
-    // Suscripción en vivo (Postgres Changes)
+    // Suscripción realtime
     const channel = supabase
       .channel('realtime:products')
       .on(
@@ -70,9 +70,14 @@ export default function App() {
     setUser(null)
   }
 
-  // =================== CRUD ===================
+  // =================== CRUD (Optimistic) ===================
   const addProduct = async () => {
     if (!name) return alert('Ingresa un nombre')
+
+    // Optimistic update
+    const tempId = Date.now()
+    const newProduct = { id: tempId, name, quantity: Number(qty) }
+    setProducts((prev) => [...prev, newProduct])
 
     const { data, error } = await supabase
       .from('products')
@@ -81,12 +86,16 @@ export default function App() {
 
     if (error) {
       console.error(error)
+      // rollback
+      setProducts((prev) => prev.filter((p) => p.id !== tempId))
       return
     }
 
-    // ⬇️ Refrescar lista en el front inmediatamente
+    // Reemplazar el temporal por el real
     if (data && data.length > 0) {
-      setProducts((prev) => [...prev, ...data])
+      setProducts((prev) =>
+        prev.map((p) => (p.id === tempId ? data[0] : p))
+      )
     }
 
     setName('')
@@ -95,21 +104,42 @@ export default function App() {
 
   const updateQuantity = async (id, change) => {
     const p = products.find((x) => x.id === id)
-    const newQty = Math.max((p?.quantity ?? 0) + change, 0)
-    await supabase.from('products').update({ quantity: newQty }).eq('id', id)
+    if (!p) return
+
+    const newQty = Math.max((p.quantity ?? 0) + change, 0)
+
+    // Optimistic update
+    setProducts((prev) =>
+      prev.map((prod) =>
+        prod.id === id ? { ...prod, quantity: newQty } : prod
+      )
+    )
+
+    const { error } = await supabase
+      .from('products')
+      .update({ quantity: newQty })
+      .eq('id', id)
+
+    if (error) {
+      console.error(error)
+      // rollback: recargamos la lista
+      fetchProducts()
+    }
   }
 
   const deleteProduct = async (id) => {
     if (!confirm('¿Eliminar este producto?')) return
 
+    // Optimistic update
+    const backup = products
+    setProducts((prev) => prev.filter((p) => p.id !== id))
+
     const { error } = await supabase.from('products').delete().eq('id', id)
     if (error) {
       console.error(error)
-      return
+      // rollback
+      setProducts(backup)
     }
-
-    // ⬇️ Quitamos de la lista en el front al instante
-    setProducts((prev) => prev.filter((p) => p.id !== id))
   }
 
   // =================== RENDER ===================
