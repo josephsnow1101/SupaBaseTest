@@ -27,7 +27,15 @@ export default function App() {
 const fetchLogs = async () => {
   const { data, error } = await supabase
     .from("product_logs")
-    .select("id, product_id, quantity_change, created_at, user_email")
+    .select(`
+      id,
+      quantity_change,
+      created_at,
+      user_email,
+      products (
+        name
+      )
+    `)
     .order("created_at", { ascending: false });
 
   if (error) {
@@ -262,7 +270,8 @@ useEffect(() => {
     <ul>
       {logs.map((log) => (
         <li key={log.id}>
-          Usuario: {log.user_email} — Cambio: {log.quantity_change} — Producto ID: {log.product_id} — Fecha: {log.created_at}
+          {log.user_email} — {log.products?.name || "Producto desconocido"} —{" "}
+          {new Date(log.created_at).toLocaleString()}
         </li>
       ))}
     </ul>
