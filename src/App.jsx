@@ -139,8 +139,44 @@ export default function App() {
           <button onClick={addProduct}>Agregar</button>
         </div>
       )}
+      // 👇 función para agregar producto
+const addProduct = async () => {
+  if (!name) return alert('Ingresa un nombre');
 
-      <ul>
+  const { data, error } = await supabase
+    .from('products')
+    .insert({ name, quantity: Number(qty) })
+    .select(); // 👈 devuelve el nuevo producto insertado
+
+  if (error) {
+    console.error(error);
+    return;
+  }
+
+  // ⬇️ Lo agregamos al estado inmediatamente
+  if (data && data.length > 0) {
+    setProducts((prev) => [...prev, ...data]);
+  }
+
+  setName('');
+  setQty(0);
+};
+
+// 👇 función para eliminar producto
+const deleteProduct = async (id) => {
+  if (!confirm('Eliminar este producto?')) return;
+
+  const { error } = await supabase.from('products').delete().eq('id', id);
+
+  if (error) {
+    console.error(error);
+    return;
+  }
+
+  // ⬇️ Quitamos el producto del estado de inmediato
+  setProducts((prev) => prev.filter((p) => p.id !== id));
+};
+  <ul>
         {products.map((p) => (
           <li key={p.id} className="product">
             <span>
