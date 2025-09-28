@@ -37,14 +37,23 @@ export default function App() {
 
   // =================== EFFECT ===================
   useEffect(() => {
-    const getSession = async () => {
-      const { data } = await supabase.auth.getSession();
+    // Detectar sesión activa
+    const session = supabase.auth.getSession().then(({ data }) => {
       if (data?.session?.user) setUser(data.session.user);
-    };
-    getSession();
+    });
+
+    // Escuchar cambios de sesión
+    const { data: authListener } = supabase.auth.onAuthStateChange(
+      (event, session) => {
+        setUser(session?.user ?? null);
+      }
+    );
+
+    // Fetch inicial
     fetchProducts();
     fetchLogs();
 
+    // Realtime Products para todos
     const channelProducts = supabase
       .channel("realtime:products")
       .on(
@@ -64,6 +73,7 @@ export default function App() {
       )
       .subscribe();
 
+    // Realtime Logs solo admin
     const channelLogs = supabase
       .channel("realtime:logs")
       .on(
@@ -78,8 +88,9 @@ export default function App() {
     return () => {
       supabase.removeChannel(channelProducts);
       supabase.removeChannel(channelLogs);
+      authListener.subscription.unsubscribe();
     };
-  }, [user]);
+  }, []);
 
   // =================== AUTH ===================
   const signIn = async () => {
