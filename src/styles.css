@@ -97,3 +97,64 @@ ul {
 .product span {
   font-weight: bold;
 }
+
+.logs-container {
+  margin-top: 20px;
+  background: #f9f9f9;
+  padding: 15px;
+  border-radius: 8px;
+  box-shadow: 0 2px 6px rgba(0,0,0,0.1);
+}
+
+.logs-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 12px;
+}
+
+.clear-logs-btn {
+  background: #e63946;
+  color: white;
+  padding: 6px 12px;
+  border: none;
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: 14px;
+}
+
+.clear-logs-btn:hover {
+  background: #c82333;
+}
+
+.logs-list {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+}
+
+.log-item {
+  display: grid;
+  grid-template-columns: 1fr 1fr auto;
+  padding: 10px;
+  border-bottom: 1px solid #ddd;
+  font-size: 14px;
+}
+
+.log-item:last-child {
+  border-bottom: none;
+}
+
+.log-user {
+  font-weight: bold;
+}
+
+.log-product {
+  text-align: center;
+  color: #444;
+}
+
+.log-date {
+  text-align: right;
+  color: #777;
+}
