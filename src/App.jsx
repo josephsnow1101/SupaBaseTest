@@ -25,22 +25,27 @@ export default function App() {
     else setProducts(data);
   };
 
-  const fetchLogs = async () => {
-    if (!isAdmin) return;
-    const { data, error } = await supabase
-      .from("product_logs")
-      .select(`
-        id,
-        quantity_change,
-        created_at,
-        user_email,
-        products(name)
-      `)
-      .order("created_at", { ascending: false });
+const fetchLogs = async () => {
+  if (!isAdmin) return;
 
-    if (error) console.error(error);
-    else setLogs(data);
-  };
+  const { data, error } = await supabase
+    .from("product_logs")
+    .select(`
+      id,
+      product_id,
+      quantity_change,
+      created_at,
+      user_email,
+      products:product_id(name)
+    `)
+    .order("created_at", { ascending: false });
+
+  if (error) {
+    console.error("Error al obtener logs:", error);
+  } else {
+    setLogs(data);
+  }
+};
 
   // =================== EFFECT ===================
   useEffect(() => {
@@ -269,11 +274,11 @@ export default function App() {
         <div className="logs">
           <h2>📜 Historial de cambios</h2>
           <ul>
-            {logs.map((log) => (
-              <li key={log.id}>
-                Producto: {log.products?.name} — Cambio: {log.quantity_change} — Usuario: {log.user_email} — {log.created_at}
-              </li>
-            ))}
+          {logs.map((log) => (
+  <li key={log.id}>
+    Producto: {log.products?.name || `ID ${log.product_id}`} — Cambio: {log.quantity_change} — Usuario: {log.user_email} — {log.created_at}
+  </li>
+))}
           </ul>
         </div>
       )}
