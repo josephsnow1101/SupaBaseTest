@@ -25,8 +25,6 @@ export default function App() {
   };
 
 const fetchLogs = async () => {
-  if (!isAdmin) return;
-
   const { data, error } = await supabase
     .from("product_logs")
     .select("id, product_id, quantity_change, created_at, user_email")
@@ -35,27 +33,24 @@ const fetchLogs = async () => {
   if (error) {
     console.error("Error al obtener logs:", error);
   } else {
-    console.log("Logs cargados:", data); // ✅ Para verificar
     setLogs(data);
+    console.log("Logs cargados:", data);
   }
 };
   // =================== EFFECT ===================
-  useEffect(() => {
-    // Detectar sesión activa
-    supabase.auth.getSession().then(({ data }) => {
-      if (data?.session?.user) setUser(data.session.user);
-    });
+useEffect(() => {
+  supabase.auth.getSession().then(({ data }) => {
+    if (data?.session?.user) setUser(data.session.user);
+  });
 
-    // Escuchar cambios de sesión
-    const { data: authListener } = supabase.auth.onAuthStateChange(
-      (event, session) => {
-        setUser(session?.user ?? null);
-      }
-    );
+  const { data: authListener } = supabase.auth.onAuthStateChange(
+    (event, session) => {
+      setUser(session?.user ?? null);
+    }
+  );
 
-    // Fetch inicial
-    fetchProducts();
-    fetchLogs();
+  fetchProducts();
+  fetchLogs();
 
     // Realtime Products para todos
     const channelProducts = supabase
@@ -261,19 +256,18 @@ const fetchLogs = async () => {
           </li>
         ))}
       </ul>
-
-      {isAdmin && (
-        <div className="logs">
-          <h2>📜 Historial de cambios</h2>
-          <ul>
-          {logs.map((log) => (
-  <li key={log.id}>
-    Producto ID: {log.product_id} — Cambio: {log.quantity_change} — Usuario: {log.user_email} — {log.created_at}
-  </li>
-))}
-          </ul>
-        </div>
-      )}
+{isAdmin && (
+  <div className="logs">
+    <h2>📜 Historial de cambios</h2>
+    <ul>
+      {logs.map((log) => (
+        <li key={log.id}>
+          Usuario: {log.user_email} — Cambio: {log.quantity_change} — Producto ID: {log.product_id} — Fecha: {log.created_at}
+        </li>
+      ))}
+    </ul>
+  </div>
+)}
     </div>
   );
 }
