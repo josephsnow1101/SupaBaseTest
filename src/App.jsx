@@ -1,3 +1,4 @@
+// App.jsx
 import React, { useEffect, useState } from "react";
 import { supabase } from "./supabaseClient";
 import "./styles.css";
@@ -11,26 +12,43 @@ export default function App() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
-
-  const isAdmin = user?.email === "jsnowoliv@gmail.com";
+  const [logs, setLogs] = useState([]);
 
   // =================== FETCH ===================
   const fetchProducts = async () => {
     const { data, error } = await supabase.from("products").select("*").order("id");
     if (error) console.error(error);
-    else setProducts(data ?? []);
+    else setProducts(data);
+  };
+
+  const fetchLogs = async () => {
+    if (!user || user.email !== "jsnowoliv@gmail.com") return;
+
+    const { data, error } = await supabase
+      .from("product_logs")
+      .select(`
+        id,
+        product_id,
+        change,
+        created_at,
+        user_id,
+        products(name)
+      `)
+      .order("created_at", { ascending: false });
+
+    if (error) console.error(error);
+    else setLogs(data);
   };
 
   useEffect(() => {
-    // Mantener sesión
     const getSession = async () => {
       const { data } = await supabase.auth.getSession();
       if (data?.session?.user) setUser(data.session.user);
     };
     getSession();
     fetchProducts();
+    fetchLogs();
 
-    // Suscripción en tiempo real
     const channel = supabase
       .channel("realtime:products")
       .on(
@@ -48,21 +66,31 @@ export default function App() {
           }
         }
       )
+      .on(
+        "postgres_changes",
+        { event: "INSERT", schema: "public", table: "product_logs" },
+        (payload) => {
+          // Solo actualiza logs si es admin
+          if (user?.email === "jsnowoliv@gmail.com") fetchLogs();
+        }
+      )
       .subscribe();
 
-    return () => {
-      supabase.removeChannel(channel);
-    };
-  }, []);
+    return () => supabase.removeChannel(channel);
+  }, [user]);
 
   // =================== AUTH ===================
   const signIn = async () => {
     setLoading(true);
-    const { data, error } = await supabase.auth.signInWithPassword({ email, password });
+    const { data, error } = await supabase.auth.signInWithPassword({
+      email,
+      password,
+    });
     setLoading(false);
     if (error) return alert(error.message);
     setUser(data.user);
     fetchProducts();
+    fetchLogs();
   };
 
   const signOut = async () => {
@@ -77,23 +105,18 @@ export default function App() {
 
     const normalizedDate = new Date(arrivalDate).toISOString().split("T")[0];
     const newProduct = { name, quantity: Number(qty), arrival_date: normalizedDate };
-
-    // Optimistic update
     const tempId = Date.now();
     setProducts((prev) => [...prev, { id: tempId, ...newProduct }]);
 
     const { data, error } = await supabase.from("products").insert(newProduct).select();
-
     if (error) {
       console.error(error);
       setProducts((prev) => prev.filter((p) => p.id !== tempId));
       return;
     }
-
-    if (data && data.length > 0) {
+    if (data?.length) {
       setProducts((prev) => prev.map((p) => (p.id === tempId ? data[0] : p)));
     }
-
     setName("");
     setQty(1);
     setArrivalDate("");
@@ -106,22 +129,24 @@ export default function App() {
     if (newQty < 0) return;
 
     // Optimistic update
-    setProducts((prev) =>
-      prev.map((p) => (p.id === id ? { ...p, quantity: newQty } : p))
-    );
+    setProducts((prev) => prev.map((p) => (p.id === id ? { ...p, quantity: newQty } : p)));
 
     const { error } = await supabase.from("products").update({ quantity: newQty }).eq("id", id);
-    if (error) {
+    if (!error) {
+      // Registrar en historial
+      await supabase.from("product_logs").insert({
+        product_id: id,
+        user_id: user.id,
+        change: delta,
+      });
+    } else {
       console.error(error);
-      setProducts((prev) =>
-        prev.map((p) => (p.id === id ? { ...p, quantity: product.quantity } : p))
-      );
+      setProducts((prev) => prev.map((p) => (p.id === id ? product : p)));
     }
   };
 
   const deleteProduct = async (id) => {
     if (!confirm("¿Eliminar este producto?")) return;
-
     const backup = [...products];
     setProducts((prev) => prev.filter((p) => p.id !== id));
 
@@ -144,17 +169,20 @@ export default function App() {
           value={password}
           onChange={(e) => setPassword(e.target.value)}
         />
-        <button onClick={signIn} disabled={loading}>
-          {loading ? "Entrando..." : "Entrar"}
-        </button>
-        <p>Usuario admin: <strong>jsnowoliv@gmail.com</strong></p>
+        <div style={{ marginTop: 8 }}>
+          <button onClick={signIn} disabled={loading}>
+            {loading ? "Entrando..." : "Entrar"}
+          </button>
+        </div>
       </div>
     );
   }
 
+  const isAdmin = user.email === "jsnowoliv@gmail.com";
+
   return (
     <div className="container">
-      <h1>📦 Stock en vivo</h1>
+      <h1>📦 Stock App</h1>
       <button onClick={signOut}>🚪 Salir</button>
 
       {isAdmin && (
@@ -167,11 +195,7 @@ export default function App() {
             onChange={(e) => setQty(e.target.value)}
             placeholder="Cantidad"
           />
-          <input
-            type="date"
-            value={arrivalDate}
-            onChange={(e) => setArrivalDate(e.target.value)}
-          />
+          <input type="date" value={arrivalDate} onChange={(e) => setArrivalDate(e.target.value)} />
           <button onClick={addProduct}>Agregar</button>
         </div>
       )}
@@ -182,14 +206,8 @@ export default function App() {
             <span>
               <strong>{p.name}</strong> — {p.quantity} 🗓️ {p.arrival_date}
             </span>
-
             <div className="buttons">
-              {/* Todos pueden restar */}
-              <button onClick={() => updateQuantity(p.id, -1)} disabled={p.quantity <= 0}>
-                ➖
-              </button>
-
-              {/* Solo admin */}
+              <button onClick={() => updateQuantity(p.id, -1)}>➖</button>
               {isAdmin && (
                 <>
                   <button onClick={() => updateQuantity(p.id, +1)}>➕</button>
@@ -200,6 +218,19 @@ export default function App() {
           </li>
         ))}
       </ul>
+
+      {isAdmin && (
+        <div className="logs">
+          <h2>📋 Historial de movimientos</h2>
+          <ul>
+            {logs.map((log) => (
+              <li key={log.id}>
+                Usuario: {log.user_id} — Producto: {log.products?.name} — Cambio: {log.change} — {log.created_at}
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
     </div>
   );
 }
