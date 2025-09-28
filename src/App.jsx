@@ -1,9 +1,8 @@
-// App.jsx
 import React, { useEffect, useState } from "react";
 import { supabase } from "./supabaseClient";
 import "./styles.css";
 
-function App() {
+export default function App() {
   const [user, setUser] = useState(null);
   const [products, setProducts] = useState([]);
   const [name, setName] = useState("");
@@ -18,10 +17,9 @@ function App() {
     const { data, error } = await supabase
       .from("products")
       .select("*")
-      .order("arrival_date", { ascending: true });
-
+      .order("id");
     if (error) console.error(error);
-    setProducts(data ?? []);
+    else setProducts(data);
   };
 
   useEffect(() => {
@@ -39,17 +37,7 @@ function App() {
         { event: "*", schema: "public", table: "products" },
         (payload) => {
           console.log("Cambio detectado:", payload);
-          if (payload.eventType === "INSERT") {
-            setProducts((prev) => [...prev, payload.new]);
-          } else if (payload.eventType === "UPDATE") {
-            setProducts((prev) =>
-              prev.map((p) => (p.id === payload.new.id ? payload.new : p))
-            );
-          } else if (payload.eventType === "DELETE") {
-            setProducts((prev) =>
-              prev.filter((p) => p.id !== payload.old.id)
-            );
-          }
+          fetchProducts(); // refresca lista
         }
       )
       .subscribe();
@@ -82,12 +70,16 @@ function App() {
     if (!name) return alert("Ingresa un nombre");
     if (!arrivalDate) return alert("Ingresa la fecha de llegada");
 
+    // Normalizar fecha a YYYY-MM-DD
+    const normalizedDate = new Date(arrivalDate).toISOString().split("T")[0];
+
     const newProduct = {
       name,
       quantity: Number(qty),
-      arrival_date: arrivalDate,
+      arrival_date: normalizedDate,
     };
 
+    // Optimistic update
     const tempId = Date.now();
     setProducts((prev) => [...prev, { id: tempId, ...newProduct }]);
 
@@ -98,7 +90,7 @@ function App() {
 
     if (error) {
       console.error(error);
-      setProducts((prev) => prev.filter((p) => p.id !== tempId));
+      setProducts((prev) => prev.filter((p) => p.id !== tempId)); // rollback
       return;
     }
 
@@ -120,6 +112,7 @@ function App() {
     const newQty = product.quantity + delta;
     if (newQty < 0) return;
 
+    // Optimistic update
     setProducts((prev) =>
       prev.map((p) => (p.id === id ? { ...p, quantity: newQty } : p))
     );
@@ -131,7 +124,12 @@ function App() {
 
     if (error) {
       console.error(error);
-      fetchProducts(); // rollback
+      // rollback
+      setProducts((prev) =>
+        prev.map((p) =>
+          p.id === id ? { ...p, quantity: product.quantity } : p
+        )
+      );
     }
   };
 
@@ -142,10 +140,9 @@ function App() {
     setProducts((prev) => prev.filter((p) => p.id !== id));
 
     const { error } = await supabase.from("products").delete().eq("id", id);
-
     if (error) {
       console.error(error);
-      setProducts(backup);
+      setProducts(backup); // rollback
     }
   };
 
@@ -170,6 +167,10 @@ function App() {
             {loading ? "Entrando..." : "Entrar"}
           </button>
         </div>
+        <p>
+          Usa el usuario admin que creaste en Supabase Auth:{" "}
+          <strong>jsnowoliv@gmail.com</strong>
+        </p>
       </div>
     );
   }
@@ -179,25 +180,28 @@ function App() {
       <h1>📦 Stock con Fechas</h1>
       <button onClick={signOut}>🚪 Salir</button>
 
-      <div className="row">
-        <input
-          placeholder="Producto"
-          value={name}
-          onChange={(e) => setName(e.target.value)}
-        />
-        <input
-          type="number"
-          min="1"
-          value={qty}
-          onChange={(e) => setQty(e.target.value)}
-        />
-        <input
-          type="date"
-          value={arrivalDate}
-          onChange={(e) => setArrivalDate(e.target.value)}
-        />
-        <button onClick={addProduct}>Agregar</button>
-      </div>
+      {user.email === "jsnowoliv@gmail.com" && (
+        <div className="form">
+          <input
+            placeholder="Producto"
+            value={name}
+            onChange={(e) => setName(e.target.value)}
+          />
+          <input
+            type="number"
+            value={qty}
+            min="1"
+            onChange={(e) => setQty(e.target.value)}
+            placeholder="Cantidad"
+          />
+          <input
+            type="date"
+            value={arrivalDate}
+            onChange={(e) => setArrivalDate(e.target.value)}
+          />
+          <button onClick={addProduct}>Agregar</button>
+        </div>
+      )}
 
       <ul>
         {products.map((p) => (
@@ -205,16 +209,16 @@ function App() {
             <span>
               <strong>{p.name}</strong> — {p.quantity} 🗓️ {p.arrival_date}
             </span>
-            <div className="buttons">
-              <button onClick={() => updateQuantity(p.id, +1)}>+1</button>
-              <button onClick={() => updateQuantity(p.id, -1)}>-1</button>
-              <button onClick={() => deleteProduct(p.id)}>🗑️</button>
-            </div>
+            {user.email === "jsnowoliv@gmail.com" && (
+              <div className="buttons">
+                <button onClick={() => updateQuantity(p.id, +1)}>+1</button>
+                <button onClick={() => updateQuantity(p.id, -1)}>-1</button>
+                <button onClick={() => deleteProduct(p.id)}>🗑️</button>
+              </div>
+            )}
           </li>
         ))}
       </ul>
     </div>
   );
 }
-
-export default App;
