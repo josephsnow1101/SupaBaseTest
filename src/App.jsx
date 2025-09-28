@@ -30,17 +30,30 @@ export default function App() {
     getSession();
     fetchProducts();
 
-    const channel = supabase
-      .channel("realtime:products")
-      .on(
-        "postgres_changes",
-        { event: "*", schema: "public", table: "products" },
-        (payload) => {
-          console.log("Cambio detectado:", payload);
-          fetchProducts(); // refresca lista
-        }
-      )
-      .subscribe();
+  const channel = supabase
+  .channel("realtime:products")
+  .on(
+    "postgres_changes",
+    { event: "*", schema: "public", table: "products" },
+    (payload) => {
+      console.log("Cambio detectado:", payload);
+      if (payload.eventType === "INSERT") {
+        setProducts((prev) => {
+          // Evitar duplicados (por optimistic update)
+          const exists = prev.some((p) => p.id === payload.new.id);
+          if (exists) return prev;
+          return [...prev, payload.new];
+        });
+      } else if (payload.eventType === "UPDATE") {
+        setProducts((prev) =>
+          prev.map((p) => (p.id === payload.new.id ? payload.new : p))
+        );
+      } else if (payload.eventType === "DELETE") {
+        setProducts((prev) => prev.filter((p) => p.id !== payload.old.id));
+      }
+    }
+  )
+  .subscribe();
 
     return () => {
       supabase.removeChannel(channel);
