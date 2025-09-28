@@ -13,7 +13,8 @@ export default function App() {
   const [loading, setLoading] = useState(false);
   const [logs, setLogs] = useState([]);
 
-  const isAdmin = user?.email === "jsnowoliv@gmail.com";
+  const isAdmin = user?.email?.toLowerCase() === "jsnowoliv@gmail.com";
+  console.log("📌 Usuario logueado:", session?.user?.email);
 
   // =================== FETCH ===================
   const fetchProducts = async () => {
