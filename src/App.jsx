@@ -32,9 +32,8 @@ const fetchLogs = async () => {
       quantity_change,
       created_at,
       user_email,
-      products (
-        name
-      )
+      product_id,
+      products:products(name)
     `)
     .order("created_at", { ascending: false });
 
@@ -198,12 +197,14 @@ const clearLogs = async () => {
   const { error } = await supabase
     .from("product_logs")
     .delete()
-    .gte("id", 0); // borra todos
+    .gte("id", 0);
 
   if (error) {
     console.error("Error al borrar historial:", error);
   } else {
-    setLogs([]); // limpia el frontend
+    setLogs([]);
+    // ✅ Re-fetch para que la suscripción siga activa correctamente
+    fetchLogs();
   }
 };
 
