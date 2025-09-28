@@ -1,0 +1,7 @@
+body { font-family: Inter, system-ui, Arial; padding: 20px; background:#fafafa; color:#111; }
+.container { max-width: 700px; margin: 0 auto; background:white; padding:18px; border-radius:8px; box-shadow:0 6px 18px rgba(0,0,0,0.06); }
+.row { display:flex; gap:8px; margin-bottom:12px; }
+input { padding:8px; border:1px solid #ccc; border-radius:6px; }
+button { padding:8px 10px; border-radius:6px; border:none; cursor:pointer; background:#3b82f6; color:white; }
+.product { display:flex; justify-content:space-between; align-items:center; padding:8px 0; border-bottom:1px solid #eee; }
+.buttons button { margin-left:6px; background:#6b7280; }
