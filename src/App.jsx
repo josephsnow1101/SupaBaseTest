@@ -30,23 +30,16 @@ const fetchLogs = async () => {
 
   const { data, error } = await supabase
     .from("product_logs")
-    .select(`
-      id,
-      product_id,
-      quantity_change,
-      created_at,
-      user_email,
-      products:product_id(name)
-    `)
+    .select("id, product_id, quantity_change, created_at, user_email")
     .order("created_at", { ascending: false });
 
   if (error) {
     console.error("Error al obtener logs:", error);
   } else {
+    console.log("Logs cargados:", data); // ✅ Para verificar
     setLogs(data);
   }
 };
-
   // =================== EFFECT ===================
   useEffect(() => {
     // Detectar sesión activa
@@ -276,7 +269,7 @@ const fetchLogs = async () => {
           <ul>
           {logs.map((log) => (
   <li key={log.id}>
-    Producto: {log.products?.name || `ID ${log.product_id}`} — Cambio: {log.quantity_change} — Usuario: {log.user_email} — {log.created_at}
+    Producto ID: {log.product_id} — Cambio: {log.quantity_change} — Usuario: {log.user_email} — {log.created_at}
   </li>
 ))}
           </ul>
