@@ -112,25 +112,13 @@ export default function App() {
       arrival_date: arrivalDate,
     };
 
-    const tempId = Date.now();
-    setProducts((prev) => [...prev, { id: tempId, ...newProduct }]);
-
     const { data, error } = await supabase
       .from("products")
       .insert(newProduct)
       .select();
 
-    if (error) {
-      console.error(error);
-      setProducts((prev) => prev.filter((p) => p.id !== tempId));
-      return;
-    }
-
-    if (data && data.length > 0) {
-      setProducts((prev) =>
-        prev.map((p) => (p.id === tempId ? data[0] : p))
-      );
-    }
+    if (error) return alert(error.message);
+    if (data && data.length > 0) setProducts((prev) => [...prev, data[0]]);
 
     setName("");
     setQty(1);
@@ -141,7 +129,7 @@ export default function App() {
     const product = products.find((p) => p.id === id);
     if (!product) return;
 
-    const newQty = product.quantity + delta;
+    const newQty = Number(product.quantity) + Number(delta);
     if (newQty < 0) return;
 
     // Optimistic update
