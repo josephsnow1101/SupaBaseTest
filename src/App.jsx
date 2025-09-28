@@ -1,119 +1,113 @@
-import { useEffect, useState } from 'react'
-import { supabase } from './supabaseClient'
+// App.jsx
+import React, { useEffect, useState } from 'react';
+import { supabase } from './supabaseClient';
 
-export default function App() {
-  const [user, setUser] = useState(null)
-  const [products, setProducts] = useState([])
-  const [name, setName] = useState('')
-  const [qty, setQty] = useState(0)
-  const [email, setEmail] = useState('')
-  const [password, setPassword] = useState('')
-  const [loading, setLoading] = useState(false)
-
-  // Carga inicial
-  const fetchProducts = async () => {
-    const { data } = await supabase.from('products').select('*').order('id')
-    setProducts(data ?? [])
-  }
+function App() {
+  const [stocks, setStocks] = useState([]);
+  const [newProduct, setNewProduct] = useState('');
 
   useEffect(() => {
-    // Mantener sesión si ya hay user
-    const getSession = async () => {
-      const { data } = await supabase.auth.getSession()
-      if (data?.session?.user) setUser(data.session.user)
-    }
-    getSession()
-    fetchProducts()
+    fetchStocks();
 
-    // Suscripción en vivo (Postgres Changes)
     const channel = supabase
-      .channel('realtime:products')
+      .channel('public:stocks')
       .on(
         'postgres_changes',
-        { event: '*', schema: 'public', table: 'products' },
+        { event: '*', schema: 'public', table: 'stocks' },
         (payload) => {
-          // Para simplicidad, re-fetch completo en cada cambio.
-          fetchProducts()
+          console.log('Cambio detectado:', payload);
+          fetchStocks();
         }
       )
-      .subscribe()
+      .subscribe();
 
     return () => {
-      supabase.removeChannel(channel)
+      supabase.removeChannel(channel);
+    };
+  }, []);
+
+  async function fetchStocks() {
+    const { data, error } = await supabase
+      .from('stocks')
+      .select('*')
+      .order('id');
+    if (error) console.error(error);
+    else setStocks(data);
+  }
+
+  async function addProduct() {
+    if (!newProduct) return;
+
+    const { data: existing, error } = await supabase
+      .from('stocks')
+      .select('*')
+      .eq('name', newProduct)
+      .single();
+
+    if (error && error.code !== 'PGRST116') {
+      console.error(error);
+      return;
     }
-  }, [])
 
-  const signIn = async () => {
-    setLoading(true)
-    const { data, error } = await supabase.auth.signInWithPassword({
-      email,
-      password,
-    })
-    setLoading(false)
-    if (error) return alert(error.message)
-    setUser(data.user)
-    fetchProducts()
+    if (existing) {
+      const { error: updateError } = await supabase
+        .from('stocks')
+        .update({ quantity: existing.quantity + 1 })
+        .eq('id', existing.id);
+
+      if (updateError) console.error(updateError);
+    } else {
+      const { error: insertError } = await supabase
+        .from('stocks')
+        .insert([{ name: newProduct, quantity: 1 }]);
+
+      if (insertError) console.error(insertError);
+    }
+
+    setNewProduct('');
   }
 
-  const signOut = async () => {
-    await supabase.auth.signOut()
-    setUser(null)
+  async function updateQuantity(id, newQty) {
+    if (newQty < 0) return; // evita negativos
+    const { error } = await supabase
+      .from('stocks')
+      .update({ quantity: newQty })
+      .eq('id', id);
+
+    if (error) console.error(error);
   }
 
-  const addProduct = async () => {
-    if (!name) return alert('Ingresa un nombre')
-    await supabase.from('products').insert({ name, quantity: Number(qty) })
-    setName('')
-    setQty(0)
-  }
-
-  const updateQuantity = async (id, change) => {
-    const p = products.find((x) => x.id === id)
-    const newQty = Math.max((p?.quantity ?? 0) + change, 0)
-    await supabase.from('products').update({ quantity: newQty }).eq('id', id)
-  }
-
-  const deleteProduct = async (id) => {
-    if (!confirm('Eliminar este producto?')) return
-    await supabase.from('products').delete().eq('id', id)
-  }
-
-  if (!user) {
-    return (
-      <div className="container">
-        <h2>Admin — iniciar sesión</h2>
-        <input placeholder="Email" value={email} onChange={(e)=>setEmail(e.target.value)} />
-        <input placeholder="Password" type="password" value={password} onChange={(e)=>setPassword(e.target.value)} />
-        <div style={{marginTop:8}}>
-          <button onClick={signIn} disabled={loading}>{loading ? 'Entrando...' : 'Entrar'}</button>
-        </div>
-        <p>Usa el usuario admin que creaste en Supabase Auth (el email que pusiste en las políticas RLS: <strong>jsnowoliv@gmail.com</strong>).</p>
-      </div>
-    )
+  async function deleteProduct(id) {
+    const { error } = await supabase.from('stocks').delete().eq('id', id);
+    if (error) console.error(error);
   }
 
   return (
-    <div className="container">
-      <h1>Stock en vivo</h1>
-      <div className="row">
-        <input placeholder="Producto" value={name} onChange={(e)=>setName(e.target.value)} />
-        <input type="number" value={qty} onChange={(e)=>setQty(e.target.value)} />
-        <button onClick={addProduct}>Agregar</button>
-        <button onClick={signOut}>Salir</button>
-      </div>
+    <div>
+      <h1>📦 Supabase Stock App</h1>
+      <input
+        value={newProduct}
+        onChange={(e) => setNewProduct(e.target.value)}
+        placeholder="Nombre del producto"
+      />
+      <button onClick={addProduct}>Agregar</button>
 
       <ul>
-        {products.map((p) => (
-          <li key={p.id} className="product">
-            <span>{p.name} ({p.quantity})</span>
-            <div className="buttons">
-              <button onClick={() => updateQuantity(p.id, +1)}>+1</button>
-              <button onClick={() => updateQuantity(p.id, -1)}>-1</button>
-              <button onClick={() => deleteProduct(p.id)}>Eliminar</button>
-            </div>
+        {stocks.map((item) => (
+          <li key={item.id}>
+            {item.name} — {item.quantity}{' '}
+            <button onClick={() => updateQuantity(item.id, item.quantity + 1)}>
+              ➕
+            </button>
+            <button onClick={() => updateQuantity(item.id, item.quantity - 1)}>
+              ➖
+            </button>
+            <button onClick={() => deleteProduct(item.id)}>🗑️</button>
           </li>
         ))}
       </ul>
     </div>
-  )
+  );
 }
+
+export default App;
