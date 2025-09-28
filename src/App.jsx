@@ -194,6 +194,14 @@ useEffect(() => {
       setProducts(backup);
     }
   };
+  const clearLogs = async () => {
+  const { error } = await supabase.from("product_logs").delete().neq("id", 0);
+  if (error) {
+    console.error("Error al borrar historial:", error);
+  } else {
+    setLogs([]);
+  }
+};
 
   // =================== RENDER ===================
   if (!user) {
@@ -265,13 +273,21 @@ useEffect(() => {
         ))}
       </ul>
 {isAdmin && (
-  <div className="logs">
-    <h2>📜 Historial de cambios</h2>
-    <ul>
+  <div className="logs-container">
+    <div className="logs-header">
+      <h2>📜 Historial de cambios</h2>
+      <button className="clear-logs-btn" onClick={clearLogs}>
+        Borrar historial
+      </button>
+    </div>
+    <ul className="logs-list">
       {logs.map((log) => (
-        <li key={log.id}>
-          {log.user_email} — {log.products?.name || "Producto desconocido"} —{" "}
-          {new Date(log.created_at).toLocaleString()}
+        <li key={log.id} className="log-item">
+          <span className="log-user">{log.user_email}</span>
+          <span className="log-product">{log.products?.name || "Producto desconocido"}</span>
+          <span className="log-date">
+            {new Date(log.created_at).toLocaleString()}
+          </span>
         </li>
       ))}
     </ul>
