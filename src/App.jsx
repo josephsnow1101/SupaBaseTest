@@ -13,6 +13,8 @@ export default function App() {
   const [loading, setLoading] = useState(false);
   const [logs, setLogs] = useState([]);
   const [modal, setModal] = useState({ open: false, type: "", productId: null });
+   const [fromDate, setFromDate] = useState("");
+  const [toDate, setToDate] = useState("");
 
   const isAdmin = user?.email?.toLowerCase() === "jsnowoliv@gmail.com";
 
@@ -45,6 +47,72 @@ export default function App() {
       setLogs(data);
       console.log("Logs cargados:", data);
     }
+  };
+   // =================== EXPORT SIN LIBRERÍAS ===================
+  const filterProductsByDate = () => {
+    if (!fromDate || !toDate) return products;
+
+    return products.filter((p) => {
+      if (!p.arrival_date) return false;
+      const d = new Date(p.arrival_date);
+      return d >= new Date(fromDate) && d <= new Date(toDate);
+    });
+  };
+
+  const exportToCSV = () => {
+    const filtered = filterProductsByDate();
+    if (filtered.length === 0) return alert("No hay productos en ese rango.");
+
+    const headers = ["ID", "Nombre", "Cantidad", "Fecha de llegada"];
+    const rows = filtered.map((p) => [p.id, p.name, p.quantity, p.arrival_date]);
+
+    const csvContent = [headers, ...rows].map((e) => e.join(",")).join("\n");
+
+    const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = "productos.csv";
+    a.click();
+  };
+
+  const exportToPDF = () => {
+    const filtered = filterProductsByDate();
+    if (filtered.length === 0) return alert("No hay productos en ese rango.");
+
+    const printWindow = window.open("", "_blank");
+    const html = `
+      <html>
+        <head>
+          <title>Reporte de productos</title>
+          <style>
+            body { font-family: Arial, sans-serif; }
+            h2 { margin-bottom: 10px; }
+            table { width: 100%; border-collapse: collapse; }
+            th, td { border: 1px solid #000; padding: 6px; text-align: left; }
+          </style>
+        </head>
+        <body>
+          <h2>Reporte de productos</h2>
+          <table>
+            <thead>
+              <tr><th>ID</th><th>Nombre</th><th>Cantidad</th><th>Fecha de llegada</th></tr>
+            </thead>
+            <tbody>
+              ${filtered
+                .map(
+                  (p) =>
+                    `<tr><td>${p.id}</td><td>${p.name}</td><td>${p.quantity}</td><td>${p.arrival_date}</td></tr>`
+                )
+                .join("")}
+            </tbody>
+          </table>
+        </body>
+      </html>
+    `;
+    printWindow.document.write(html);
+    printWindow.document.close();
+    printWindow.print();
   };
 
   // =================== EFFECT ===================
@@ -292,6 +360,25 @@ export default function App() {
             onChange={(e) => setArrivalDate(e.target.value)}
           />
           <button onClick={addProduct}>Agregar</button>
+        </div>
+      )}
+      {isAdmin && (
+        <div className="export-section">
+          <h3>📤 Exportar productos</h3>
+          <label>Desde: </label>
+          <input
+            type="date"
+            value={fromDate}
+            onChange={(e) => setFromDate(e.target.value)}
+          />
+          <label>Hasta: </label>
+          <input
+            type="date"
+            value={toDate}
+            onChange={(e) => setToDate(e.target.value)}
+          />
+          <button onClick={exportToCSV}>📊 Exportar a CSV</button>
+          <button onClick={exportToPDF}>📄 Exportar a PDF</button>
         </div>
       )}
 
