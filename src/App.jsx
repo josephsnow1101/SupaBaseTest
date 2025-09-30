@@ -13,10 +13,10 @@ export default function App() {
   const [loading, setLoading] = useState(false);
   const [logs, setLogs] = useState([]);
   const [modal, setModal] = useState({ open: false, type: "", productId: null });
-   const [fromDate, setFromDate] = useState("");
+  const [fromDate, setFromDate] = useState("");
   const [toDate, setToDate] = useState("");
   const [showConfirm, setShowConfirm] = useState(false);
-const [productToReduce, setProductToReduce] = useState(null);
+  const [productToReduce, setProductToReduce] = useState(null);
 
   const isAdmin = user?.email?.toLowerCase() === "jsnowoliv@gmail.com";
 
@@ -50,7 +50,8 @@ const [productToReduce, setProductToReduce] = useState(null);
       console.log("Logs cargados:", data);
     }
   };
-   // =================== EXPORT SIN LIBRERÍAS ===================
+
+  // =================== EXPORT SIN LIBRERÍAS ===================
   const filterProductsByDate = () => {
     if (!fromDate || !toDate) return products;
 
@@ -116,43 +117,41 @@ const [productToReduce, setProductToReduce] = useState(null);
     printWindow.document.close();
     printWindow.print();
   };
-// ======= Función para abrir el popup =======
-const handleReduceClick = (product) => {
-  setProductToReduce(product);
-  setShowConfirm(true);
-};
 
-// ======= Confirmar la acción =======
-const confirmReduce = async () => {
-  if (!productToReduce) return;
+  // ======= Vendedor: abrir popup =======
+  const handleReduceClick = (product) => {
+    setProductToReduce(product);
+    setShowConfirm(true);
+  };
 
-  const newQuantity = productToReduce.quantity - 1;
-  if (newQuantity < 0) return alert("No puedes tener cantidades negativas.");
+  // ======= Confirmar la acción =======
+  const confirmReduce = async () => {
+    if (!productToReduce) return;
 
-  const { error } = await supabase
-    .from("products")
-    .update({ quantity: newQuantity })
-    .eq("id", productToReduce.id);
+    const newQuantity = productToReduce.quantity - 1;
+    if (newQuantity < 0) return alert("No puedes tener cantidades negativas.");
 
-  if (!error) {
-    setProducts((prev) =>
-      prev.map((p) =>
-        p.id === productToReduce.id ? { ...p, quantity: newQuantity } : p
-      )
-    );
-  }
+    const { error } = await supabase
+      .from("products")
+      .update({ quantity: newQuantity })
+      .eq("id", productToReduce.id);
 
-  setShowConfirm(false);
-  setProductToReduce(null);
-};
+    if (!error) {
+      setProducts((prev) =>
+        prev.map((p) =>
+          p.id === productToReduce.id ? { ...p, quantity: newQuantity } : p
+        )
+      );
+    }
 
-// ======= Cancelar =======
-const cancelReduce = () => {
-  setShowConfirm(false);
-  setProductToReduce(null);
-};
+    setShowConfirm(false);
+    setProductToReduce(null);
+  };
 
-  
+  const cancelReduce = () => {
+    setShowConfirm(false);
+    setProductToReduce(null);
+  };
 
   // =================== EFFECT ===================
   useEffect(() => {
@@ -293,7 +292,7 @@ const cancelReduce = () => {
   };
 
   const deleteProduct = (id) => {
-    if (!isAdmin) return; // Sin modal ni acción para usuario@tienda
+    if (!isAdmin) return;
     setModal({ open: true, type: "confirm-delete", productId: id });
   };
 
@@ -401,6 +400,7 @@ const cancelReduce = () => {
           <button onClick={addProduct}>Agregar</button>
         </div>
       )}
+
       {isAdmin && (
         <div className="export-section">
           <h3>📤 Exportar productos</h3>
@@ -429,14 +429,13 @@ const cancelReduce = () => {
               {isAdmin && (
                 <>
                   <button onClick={() => updateQuantity(p.id, 1)}>➕</button>
-                  {!isAdmin && (
-  <button onClick={() => handleReduceClick(p)}>➖</button>
-)}
+                  <button onClick={() => updateQuantity(p.id, -1)}>➖</button>
                   <button onClick={() => deleteProduct(p.id)}>🗑️</button>
                 </>
               )}
+
               {!isAdmin && (
-                <button onClick={() => updateQuantity(p.id, -1)}>➖</button>
+                <button onClick={() => handleReduceClick(p)}>➖</button>
               )}
             </div>
           </li>
@@ -466,18 +465,23 @@ const cancelReduce = () => {
           </ul>
         </div>
       )}
+
+      {/* 📌 Modal de confirmación para vendedores */}
+      {showConfirm && (
+        <div className="modal-overlay">
+          <div className="modal-box">
+            <h3>⚠️ Confirmar acción</h3>
+            <p>
+              ¿Seguro que deseas restar 1 a{" "}
+              <strong>{productToReduce?.name}</strong>?
+            </p>
+            <div className="modal-buttons">
+              <button onClick={cancelReduce}>Cancelar</button>
+              <button onClick={confirmReduce}>Confirmar</button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
-{showConfirm && (
-  <div className="modal-overlay">
-    <div className="modal-box">
-      <h3>⚠️ Confirmar acción</h3>
-      <p>¿Seguro que deseas restar 1 a <strong>{productToReduce?.name}</strong>?</p>
-      <div className="modal-buttons">
-        <button onClick={cancelReduce}>Cancelar</button>
-        <button onClick={confirmReduce}>Confirmar</button>
-      </div>
-    </div>
-  </div>
-)}
