@@ -141,6 +141,15 @@ export default function App() {
           p.id === productToReduce.id ? { ...p, quantity: newQuantity } : p
         )
       );
+
+      // ✅ Log: vendedor restó cantidad
+      await supabase.from("product_logs").insert([
+        {
+          product_id: productToReduce.id,
+          quantity_change: -1,
+          user_email: user.email,
+        },
+      ]);
     }
 
     setShowConfirm(false);
@@ -187,7 +196,7 @@ export default function App() {
       )
       .subscribe();
 
-    // Realtime Logs mejorado
+    // Realtime Logs
     const channelLogs = supabase
       .channel("realtime:logs")
       .on(
@@ -249,7 +258,18 @@ export default function App() {
       .select();
 
     if (error) return alert(error.message);
-    if (data && data.length > 0) setProducts((prev) => [...prev, data[0]]);
+    if (data && data.length > 0) {
+      setProducts((prev) => [...prev, data[0]]);
+
+      // ✅ Log: producto creado
+      await supabase.from("product_logs").insert([
+        {
+          product_id: data[0].id,
+          quantity_change: newProduct.quantity,
+          user_email: user.email,
+        },
+      ]);
+    }
 
     setName("");
     setQty(1);
@@ -282,14 +302,14 @@ export default function App() {
       return;
     }
 
-    const { error: logError } = await supabase.from("product_logs").insert([
+    // ✅ Log: cambio de cantidad
+    await supabase.from("product_logs").insert([
       {
         product_id: id,
         quantity_change: delta,
         user_email: user.email,
       },
     ]);
-    if (logError) console.error(logError);
   };
 
   const deleteProduct = (id) => {
@@ -306,6 +326,15 @@ export default function App() {
     if (error) {
       console.error(error);
       setProducts(backup);
+    } else {
+      // ✅ Log: producto eliminado
+      await supabase.from("product_logs").insert([
+        {
+          product_id: id,
+          quantity_change: -9999, // simbólico = eliminado
+          user_email: user.email,
+        },
+      ]);
     }
     setModal({ open: false, type: "", productId: null });
   };
@@ -316,7 +345,6 @@ export default function App() {
 
   const clearLogs = async () => {
     const { error } = await supabase.from("product_logs").delete().gte("id", 0);
-
     if (error) {
       console.error("Error al borrar historial:", error);
     } else {
@@ -452,7 +480,7 @@ export default function App() {
               <li key={log.id} className="log-item">
                 <span className="log-user">{log.user_email}</span>
                 <span className="log-product">
-                  {log.products?.name || "Producto desconocido"}
+                  {log.products?.name || "Producto eliminado"}
                 </span>
                 <span className="log-date">
                   {new Date(log.created_at).toLocaleString()}
