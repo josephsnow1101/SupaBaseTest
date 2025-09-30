@@ -47,11 +47,10 @@ export default function App() {
       console.error("Error al obtener logs:", error);
     } else {
       setLogs(data);
-      console.log("Logs cargados:", data);
     }
   };
 
-  // =================== EXPORT SIN LIBRERÍAS ===================
+  // =================== EXPORT ===================
   const filterProductsByDate = () => {
     if (!fromDate || !toDate) return products;
 
@@ -182,22 +181,26 @@ export default function App() {
               prev.map((p) => (p.id === payload.new.id ? payload.new : p))
             );
           } else if (payload.eventType === "DELETE") {
-            setProducts((prev) =>
-              prev.filter((p) => p.id !== payload.old.id)
-            );
+            setProducts((prev) => prev.filter((p) => p.id !== payload.old.id));
           }
         }
       )
       .subscribe();
 
-    // Realtime Logs
+    // Realtime Logs mejorado
     const channelLogs = supabase
       .channel("realtime:logs")
       .on(
         "postgres_changes",
         { event: "*", schema: "public", table: "product_logs" },
-        () => {
-          fetchLogs();
+        (payload) => {
+          if (payload.eventType === "INSERT") {
+            setLogs((prev) => [payload.new, ...prev]);
+          } else if (payload.eventType === "DELETE") {
+            setLogs((prev) => prev.filter((log) => log.id !== payload.old.id));
+          } else {
+            fetchLogs();
+          }
         }
       )
       .subscribe();
@@ -260,7 +263,6 @@ export default function App() {
     const newQty = Number(product.quantity) + Number(delta);
     if (newQty < 0) return;
 
-    // Optimistic update
     setProducts((prev) =>
       prev.map((p) => (p.id === id ? { ...p, quantity: newQty } : p))
     );
@@ -280,7 +282,6 @@ export default function App() {
       return;
     }
 
-    // Log action
     const { error: logError } = await supabase.from("product_logs").insert([
       {
         product_id: id,
@@ -314,16 +315,12 @@ export default function App() {
   };
 
   const clearLogs = async () => {
-    const { error } = await supabase
-      .from("product_logs")
-      .delete()
-      .gte("id", 0);
+    const { error } = await supabase.from("product_logs").delete().gte("id", 0);
 
     if (error) {
       console.error("Error al borrar historial:", error);
     } else {
       setLogs([]);
-      fetchLogs();
     }
   };
 
