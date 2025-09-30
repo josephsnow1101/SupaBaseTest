@@ -15,6 +15,8 @@ export default function App() {
   const [modal, setModal] = useState({ open: false, type: "", productId: null });
    const [fromDate, setFromDate] = useState("");
   const [toDate, setToDate] = useState("");
+  const [showConfirm, setShowConfirm] = useState(false);
+const [productToReduce, setProductToReduce] = useState(null);
 
   const isAdmin = user?.email?.toLowerCase() === "jsnowoliv@gmail.com";
 
@@ -114,6 +116,43 @@ export default function App() {
     printWindow.document.close();
     printWindow.print();
   };
+// ======= Función para abrir el popup =======
+const handleReduceClick = (product) => {
+  setProductToReduce(product);
+  setShowConfirm(true);
+};
+
+// ======= Confirmar la acción =======
+const confirmReduce = async () => {
+  if (!productToReduce) return;
+
+  const newQuantity = productToReduce.quantity - 1;
+  if (newQuantity < 0) return alert("No puedes tener cantidades negativas.");
+
+  const { error } = await supabase
+    .from("products")
+    .update({ quantity: newQuantity })
+    .eq("id", productToReduce.id);
+
+  if (!error) {
+    setProducts((prev) =>
+      prev.map((p) =>
+        p.id === productToReduce.id ? { ...p, quantity: newQuantity } : p
+      )
+    );
+  }
+
+  setShowConfirm(false);
+  setProductToReduce(null);
+};
+
+// ======= Cancelar =======
+const cancelReduce = () => {
+  setShowConfirm(false);
+  setProductToReduce(null);
+};
+
+  
 
   // =================== EFFECT ===================
   useEffect(() => {
@@ -390,7 +429,9 @@ export default function App() {
               {isAdmin && (
                 <>
                   <button onClick={() => updateQuantity(p.id, 1)}>➕</button>
-                  <button onClick={() => updateQuantity(p.id, -1)}>➖</button>
+                  {!isAdmin && (
+  <button onClick={() => handleReduceClick(p)}>➖</button>
+)}
                   <button onClick={() => deleteProduct(p.id)}>🗑️</button>
                 </>
               )}
@@ -428,3 +469,15 @@ export default function App() {
     </div>
   );
 }
+{showConfirm && (
+  <div className="modal-overlay">
+    <div className="modal-box">
+      <h3>⚠️ Confirmar acción</h3>
+      <p>¿Seguro que deseas restar 1 a <strong>{productToReduce?.name}</strong>?</p>
+      <div className="modal-buttons">
+        <button onClick={cancelReduce}>Cancelar</button>
+        <button onClick={confirmReduce}>Confirmar</button>
+      </div>
+    </div>
+  </div>
+)}
