@@ -210,15 +210,16 @@ ul {
 }
 
 /* Caja del modal */
-.modal-content {
-  background: #fff;
+.modal-box {
+  background: #3F4E3E; /* fondo igual que container */
   padding: 20px 25px;
   border-radius: 12px;
   text-align: center;
   max-width: 350px;
   width: 90%;
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4);
   animation: popup 0.2s ease-in-out;
+  color: #F5ECD7;
 }
 
 /* Animación de entrada */
@@ -233,7 +234,7 @@ ul {
   }
 }
 
-/* Botones */
+/* Botones dentro del modal */
 .modal-buttons {
   margin-top: 15px;
   display: flex;
@@ -241,29 +242,30 @@ ul {
   gap: 10px;
 }
 
-.btn-confirm {
+.modal-buttons button {
   padding: 8px 16px;
-  background: #4caf50;
-  color: white;
   border: none;
   border-radius: 8px;
   cursor: pointer;
+  font-weight: bold;
   transition: background 0.2s;
 }
 
-.btn-confirm:hover {
-  background: #43a047;
+/* Botón de confirmar */
+.modal-buttons button:last-child {
+  background: #2B2B2B;
+  color: #F5ECD7;
+}
+.modal-buttons button:last-child:hover {
+  background: #F5ECD7;
+  color: #2B2B2B;
 }
 
-.btn-cancel {
-  padding: 8px 16px;
-  background: #ccc;
-  border: none;
-  border-radius: 8px;
-  cursor: pointer;
-  transition: background 0.2s;
+/* Botón de cancelar */
+.modal-buttons button:first-child {
+  background: #B0413E;
+  color: #fff;
 }
-
-.btn-cancel:hover {
-  background: #b3b3b3;
+.modal-buttons button:first-child:hover {
+  background: #8F3532;
 }
