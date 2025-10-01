@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState, useCallback } from "react";
+import React, { useEffect, useMemo, useState, useCallback, useRef } from "react";
 import { supabase } from "./supabaseClient";
 import "./styles.css";
 
@@ -18,7 +18,7 @@ export default function App() {
   const [fromDate, setFromDate] = useState("");
   const [toDate, setToDate] = useState("");
 
-  // Confirmación para vendedores (ahora con cantidad personalizada)
+  // Confirmación para vendedores (cantidad personalizada)
   const [showConfirm, setShowConfirm] = useState(false);
   const [productToReduce, setProductToReduce] = useState(null);
   const [reduceAmount, setReduceAmount] = useState(1);
@@ -225,7 +225,7 @@ export default function App() {
     printWindow.print();
   };
 
-  // ======= Vendedor: abrir popup (ahora con cantidad) =======
+  // ======= Vendedor: abrir popup (cantidad) =======
   const handleReduceClick = (product) => {
     setProductToReduce(product);
     setReduceAmount(1);
@@ -499,7 +499,7 @@ export default function App() {
       )
     );
 
-    // Logueamos edición con quantity_change = 0 (manteniendo esquema)
+    // Logueamos edición con quantity_change = 0
     await supabase.from("product_logs").insert([
       {
         product_id: editId,
@@ -510,6 +510,91 @@ export default function App() {
 
     cancelEdit();
   };
+
+  // =================== DASHBOARD: totales y bajo stock ===================
+  const totalProducts = products.length;
+  const totalUnits = useMemo(
+    () => products.reduce((acc, p) => acc + Number(p.quantity || 0), 0),
+    [products]
+  );
+
+  const topN = 10;
+  const topProducts = useMemo(() => {
+    const sorted = [...products].sort((a, b) => b.quantity - a.quantity);
+    return sorted.slice(0, topN);
+  }, [products]);
+
+  const lowCount = 3; // cuántos mostrar en "menos stock"
+  const lowStockProducts = useMemo(() => {
+    const sorted = [...products].sort((a, b) => a.quantity - b.quantity);
+    return sorted.slice(0, Math.min(lowCount, sorted.length));
+  }, [products]);
+
+  // =================== CHART.JS (CDN) ===================
+  const canvasRef = useRef(null);
+  const chartRef = useRef(null);
+
+  const ensureChartJsAndRender = useCallback(() => {
+    const render = () => {
+      if (!canvasRef.current) return;
+
+      // destruir instancia previa si existe
+      if (chartRef.current) {
+        chartRef.current.destroy();
+        chartRef.current = null;
+      }
+
+      const labels = topProducts.map((p) =>
+        p.name.length > 18 ? p.name.slice(0, 18) + "…" : p.name
+      );
+      const data = topProducts.map((p) => Number(p.quantity || 0));
+
+      const ctx = canvasRef.current.getContext("2d");
+      chartRef.current = new window.Chart(ctx, {
+        type: "bar",
+        data: {
+          labels,
+          datasets: [
+            {
+              label: "Cantidad",
+              data,
+            },
+          ],
+        },
+        options: {
+          responsive: true,
+          plugins: {
+            legend: { display: false },
+            title: { display: true, text: `Top ${topProducts.length} por stock` },
+          },
+          scales: {
+            x: { ticks: { autoSkip: true, maxTicksLimit: 10 } },
+            y: { beginAtZero: true, precision: 0 },
+          },
+        },
+      });
+    };
+
+    if (!window.Chart) {
+      const script = document.createElement("script");
+      script.src = "https://cdn.jsdelivr.net/npm/chart.js";
+      script.async = true;
+      script.onload = render;
+      document.body.appendChild(script);
+    } else {
+      render();
+    }
+  }, [topProducts]);
+
+  useEffect(() => {
+    ensureChartJsAndRender();
+    return () => {
+      if (chartRef.current) {
+        chartRef.current.destroy();
+        chartRef.current = null;
+      }
+    };
+  }, [ensureChartJsAndRender]);
 
   // =================== HISTORIAL POR PRODUCTO ===================
   const openHistoryForProduct = async (p) => {
@@ -522,55 +607,6 @@ export default function App() {
     setProductHistoryOpen(false);
     setHistoryForProduct(null);
     setHistoryLogs([]);
-  };
-
-  // =================== DASHBOARD (Totales + Gráfico SVG) ===================
-  const totalProducts = products.length;
-  const totalUnits = useMemo(
-    () => products.reduce((acc, p) => acc + Number(p.quantity || 0), 0),
-    [products]
-  );
-  const topN = 10;
-  const topProducts = useMemo(() => {
-    const sorted = [...products].sort((a, b) => b.quantity - a.quantity);
-    return sorted.slice(0, topN);
-  }, [products]);
-
-  const Chart = ({ data, width = 640, height = 240, padding = 32 }) => {
-    if (!data || data.length === 0) return null;
-    const maxVal = Math.max(...data.map((d) => Number(d.quantity)));
-    const barW = (width - padding * 2) / data.length;
-    const scaleY = (val) =>
-      height - padding - (Number(val) / (maxVal || 1)) * (height - padding * 2);
-
-    return (
-      <svg width={width} height={height} style={{ border: "1px solid #eee", borderRadius: 8 }}>
-        {/* Axis */}
-        <line x1={padding} y1={height - padding} x2={width - padding} y2={height - padding} stroke="#999" />
-        <line x1={padding} y1={padding} x2={padding} y2={height - padding} stroke="#999" />
-        {/* Bars */}
-        {data.map((d, i) => {
-          const x = padding + i * barW + 8;
-          const y = scaleY(d.quantity);
-          const h = height - padding - y;
-          return (
-            <g key={d.id}>
-              <rect x={x} y={y} width={barW - 16} height={h} rx={6} />
-              <text x={x + (barW - 16) / 2} y={height - padding + 14} fontSize="10" textAnchor="middle">
-                {d.name.length > 8 ? d.name.slice(0, 8) + "…" : d.name}
-              </text>
-              <text x={x + (barW - 16) / 2} y={y - 4} fontSize="10" textAnchor="middle">
-                {d.quantity}
-              </text>
-            </g>
-          );
-        })}
-        {/* Title */}
-        <text x={width / 2} y={18} textAnchor="middle" fontSize="12" fontWeight="bold">
-          Top {data.length} por stock
-        </text>
-      </svg>
-    );
   };
 
   // =================== LOGIN VIEW ===================
@@ -682,19 +718,36 @@ export default function App() {
       <h1>📦 Stock App</h1>
       <button onClick={signOut}>🚪 Salir</button>
 
-      {/* DASHBOARD */}
-      <div className="dashboard">
-        <div className="card">
-          <div className="metric">Productos</div>
-          <div className="value">{totalProducts}</div>
+      {/* DASHBOARD — ORDEN EXACTO */}
+      <div className="chart-wrapper" style={{ background: "#2C3A2A", padding: "1rem", borderRadius: 10, marginTop: "1rem" }}>
+        <canvas ref={canvasRef} height="220" />
+      </div>
+
+      <div className="dashboard" style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "10px", marginTop: "12px" }}>
+        <div className="card" style={{ background: "#E7D6B1", color: "#171515", borderRadius: 10, padding: "12px" }}>
+          <div className="metric" style={{ opacity: 0.8 }}>Unidades totales</div>
+          <div className="value" style={{ fontSize: "1.4rem", fontWeight: "bold" }}>{totalUnits}</div>
         </div>
-        <div className="card">
-          <div className="metric">Unidades totales</div>
-          <div className="value">{totalUnits}</div>
+        <div className="card" style={{ background: "#E7D6B1", color: "#171515", borderRadius: 10, padding: "12px" }}>
+          <div className="metric" style={{ opacity: 0.8 }}>Total de productos</div>
+          <div className="value" style={{ fontSize: "1.4rem", fontWeight: "bold" }}>{totalProducts}</div>
         </div>
       </div>
-      <div className="chart-wrapper">
-        <Chart data={topProducts} />
+
+      <div className="low-stock" style={{ background: "#2C3A2A", marginTop: "12px", padding: "12px", borderRadius: 10 }}>
+        <h2 style={{ marginBottom: "8px" }}>📉 Productos con menos stock</h2>
+        {lowStockProducts.length === 0 ? (
+          <p>No hay productos.</p>
+        ) : (
+          <ul>
+            {lowStockProducts.map((p) => (
+              <li key={p.id} className="product" style={{ display: "flex", justifyContent: "space-between" }}>
+                <span>{p.name}</span>
+                <span>{p.quantity}</span>
+              </li>
+            ))}
+          </ul>
+        )}
       </div>
 
       {/* Alta */}
