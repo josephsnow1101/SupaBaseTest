@@ -269,3 +269,114 @@ ul {
 .modal-buttons button:first-child:hover {
   background: #8F3532;
 }
+
+/* ========== DASHBOARD ========== */
+.dashboard {
+  background: #2C3A2A;
+  padding: 1.2rem;
+  border-radius: 10px;
+  margin-bottom: 1.5rem;
+  box-shadow: 0 4px 10px rgba(0, 0, 0, 0.3);
+  color: #F5ECD7;
+}
+
+.dashboard h2 {
+  margin-bottom: 1rem;
+  text-align: center;
+  color: #F5ECD7;
+}
+
+.dashboard-stats {
+  display: flex;
+  justify-content: space-between;
+  gap: 1rem;
+  margin-bottom: 1.5rem;
+}
+
+.dashboard-card {
+  flex: 1;
+  background: #3F4E3E;
+  padding: 1rem;
+  text-align: center;
+  border-radius: 8px;
+  box-shadow: 0 2px 6px rgba(0,0,0,0.3);
+}
+
+.dashboard-card span {
+  font-size: 1.1rem;
+  font-weight: bold;
+}
+
+/* Contenedor del gráfico */
+.chart-container {
+  width: 100%;
+  background: #3F4E3E;
+  padding: 1rem;
+  border-radius: 8px;
+  box-shadow: 0 2px 6px rgba(0,0,0,0.3);
+  margin-top: 1rem;
+}
+
+/* ========== BOTONES EN PRODUCTO ========== */
+.product .icon-btn {
+  background: #2B2B2B;
+  color: #F5ECD7;
+  padding: 6px 10px;
+  border-radius: 6px;
+  font-size: 0.9rem;
+  cursor: pointer;
+  margin-left: 6px;
+  transition: 0.2s;
+}
+
+.product .icon-btn:hover {
+  background: #F5ECD7;
+  color: #2B2B2B;
+}
+
+/* ========== MODAL PARA EDITAR Y RESTAR CANTIDAD ========== */
+.edit-modal, .history-modal {
+  background: #3F4E3E;
+  padding: 20px;
+  border-radius: 12px;
+  box-shadow: 0 4px 12px rgba(0,0,0,0.4);
+  max-width: 400px;
+  width: 90%;
+  color: #F5ECD7;
+  text-align: center;
+}
+
+.edit-modal input,
+.history-modal input {
+  width: 100%;
+  padding: 0.7rem;
+  border-radius: 6px;
+  border: 1px solid #55614A;
+  background: #D8C9A6;
+  color: #2B2B2B;
+  font-size: 1rem;
+  margin-bottom: 1rem;
+}
+
+/* ========== EXPORTACIÓN LOGS ========== */
+.export-buttons {
+  display: flex;
+  gap: 10px;
+  margin-top: 10px;
+}
+
+.export-btn {
+  padding: 0.6rem 1rem;
+  border-radius: 6px;
+  border: none;
+  cursor: pointer;
+  font-weight: bold;
+  background: #2B2B2B;
+  color: #F5ECD7;
+  transition: 0.2s;
+}
+
+.export-btn:hover {
+  background: #F5ECD7;
+  color: #2B2B2B;
+}
