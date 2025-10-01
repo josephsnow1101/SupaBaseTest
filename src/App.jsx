@@ -308,7 +308,7 @@ export default function App() {
       )
       .subscribe();
 
-    // Realtime Logs (enriquecemos con nombre si lo tenemos en memoria)
+    // Realtime Logs
     const channelLogs = supabase
       .channel("realtime:logs")
       .on(
@@ -316,11 +316,7 @@ export default function App() {
         { event: "*", schema: "public", table: "product_logs" },
         (payload) => {
           if (payload.eventType === "INSERT") {
-            const prod = products.find((p) => p.id === payload.new.product_id);
-            const enriched = prod
-              ? { ...payload.new, products: { name: prod.name } }
-              : payload.new;
-            setLogs((prev) => [enriched, ...prev]);
+            fetchLogs(); // siempre recargar logs para evitar inconsistencias
           } else if (payload.eventType === "DELETE") {
             setLogs((prev) => prev.filter((log) => log.id !== payload.old.id));
           } else {
@@ -335,7 +331,7 @@ export default function App() {
       supabase.removeChannel(channelLogs);
       authListener.subscription.unsubscribe();
     };
-  }, [fetchLogs, fetchProducts, products]);
+  }, [fetchLogs, fetchProducts]);
 
   // =================== AUTH ===================
   const signIn = async () => {
